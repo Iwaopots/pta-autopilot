@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "PTA homework · multi-account",
+    "description": "PTA (pintia.cn) homework toolkit: each account keeps its PTASession in the DSH credential service, so cookies never enter the chat; pull problem sets, check status, read compact briefs, submit objective answers in one shot, and submit programs with judge polling."
+  }
+}

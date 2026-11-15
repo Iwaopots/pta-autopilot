@@ -1,0 +1,39 @@
+{
+  "name": "dsh-pta",
+  "version": "0.1.0",
+  "description": "PTA（pintia.cn）作业工具包：按账号隔离的凭据保险箱、题目集与编程题工具、原生 Skill 工作流。",
+  "type": "module",
+  "main": "./index.js",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "skills",
+    "locale",
+    "docs",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": ["dsh", "dsh-plugin", "pta", "pintia", "homework"],
+  "license": "MIT"
+}

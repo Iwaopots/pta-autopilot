@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "PTA 作业 · 多账号",
+    "description": "PTA（pintia.cn）作业工具包：每个账号的 PTASession 单独存在 DSH 凭据服务里，Cookie 不进对话；拉题、看状态、压缩读题、整卷交客观题、提交编程题并等判题。"
+  }
+}

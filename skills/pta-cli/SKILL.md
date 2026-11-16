@@ -14,7 +14,8 @@ whenToUse: 用户提到 PTA、pintia、拼题A、PTA 作业/题目集/提交判�
 
 1. 按下面第 1~3 节做（所有工具都带消息里给的 `account`）。
 2. 每完成一个题型或一道编程题，`pta_progress id=<任务id> done=<已完成> total=<todo 总数> note=<一句话>`。它同时是心跳：**20 分钟没有心跳会被判定中断并重排**。
-3. 结束前 `pta_status` 复核，然后 `pta_finish id=<任务id> status=done`；做不完/卡住用 `status=failed error=<原因>`（未满 3 次会自动退避重试，原因写清楚下次才能避开）。
+3. 结束前 `pta_status` 复核，然后 `pta_finish id=<任务id> status=done`；做不完/卡住用 `status=failed error=<原因> reason=<分类>`。reason 取 `auth_required`（登录失效：不重试，并暂停该账号队列，等用户在面板重登）、`not_started`（未开放/无权限：不重试）、`rate_limited`（限流：长退避）、`compile_error` / `wrong_answer` / `other`（未满 3 次自动退避重试）。原因写清楚，下次重试的指令里会带上。
+3.1 如果指令里写着「这是第 N 次尝试」，说明上次可能已交过一部分：先 `pta_status`，只做 `todo` 里的题，已 AC 的不要重交。
 4. 题集若是限时考试/监考类，立即 `pta_finish status=failed error="考试类题集，需用户确认"`，不要作答。
 
 用户在对话里说「执行 PTA 任务」（宿主不支持自动开会话时）→ `pta_tasks claim=true` 领一个（自动遵守账号锁和并发上限），然后同上。

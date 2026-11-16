@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
         --pt-bg:var(--dsw-alias-bg-primary,#fff);--pt-bg2:var(--dsw-alias-bg-secondary,#f6f8fa);--pt-line:var(--dsw-alias-border-secondary,#e5e7eb);
         --pt-accent:var(--dsw-alias-state-business-primary,#0969da);--pt-hover:var(--dsw-alias-interactive-bg-hover,#f3f4f6);
         --pt-ok:#1a7f37;--pt-okbg:#dafbe1;--pt-bad:#cf222e;--pt-badbg:#ffebe9;--pt-warn:#9a6700;--pt-warnbg:#fff8c5;--pt-run:#0969da;--pt-runbg:#ddf4ff;
-        display:flex;flex-direction:column;gap:12px;padding:16px 18px;height:100%;overflow:auto;font-size:13px;color:var(--pt-fg);box-sizing:border-box}
+        display:flex;flex-direction:column;gap:12px;padding:16px 18px;height:100%;overflow:auto;font-size:13px;color:var(--pt-fg);box-sizing:border-box;container-type:inline-size;container-name:ptap}
       .ptap *{box-sizing:border-box}
       .ptap-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
       .ptap-title{font-size:16px;font-weight:650}
@@ -26,8 +26,20 @@ window.__ModuleLoader__.load({
       .ptap-kpi b{display:block;font-size:20px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums}
       .ptap-kpi span{font-size:11.5px;color:var(--pt-fg3)}
       .ptap-grid{display:grid;grid-template-columns:minmax(250px,1fr) minmax(340px,1.55fr) minmax(290px,1.2fr);gap:12px;align-items:start}
-      @media (max-width:1180px){.ptap-grid{grid-template-columns:1fr 1fr}.ptap-col-q{grid-column:1 / -1}}
-      @media (max-width:760px){.ptap-grid{grid-template-columns:1fr}}
+      .ptap-grid.single{grid-template-columns:minmax(360px,1.7fr) minmax(300px,1fr)}
+      @container ptap (max-width:1100px){.ptap-grid{grid-template-columns:1fr 1fr}.ptap-grid:not(.single) .ptap-col-q{grid-column:1 / -1}}
+      @container ptap (max-width:700px){.ptap-grid,.ptap-grid.single{grid-template-columns:1fr}.ptap-kpis{grid-template-columns:repeat(2,1fr)}.ptap-sub{display:none}}
+      .ptap-accbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px}
+      .ptap-accbar .ptap-name{font-size:13.5px}
+      .ptap-skel{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--pt-bg2) 25%,var(--pt-hover) 50%,var(--pt-bg2) 75%);background-size:200% 100%;animation:ptap-shim 1.3s linear infinite}
+      @keyframes ptap-shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+      .ptap-cells{display:flex;flex-wrap:wrap;gap:3px;padding-top:2px}
+      .ptap-cell{width:12px;height:12px;border-radius:3px;background:var(--pt-bg2);border:1px solid var(--pt-line)}
+      .ptap-cell.ok{background:#2da44e;border-color:#2da44e}.ptap-cell.partial{background:#d4a72c;border-color:#d4a72c}.ptap-cell.wrong{background:var(--pt-bad);border-color:var(--pt-bad)}
+      .ptap-link{background:none;border:none;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left;min-width:0}
+      .ptap-link:hover .ptap-name{text-decoration:underline}
+      .ptap-timeline{border-left:2px solid var(--pt-line);margin:2px 0 0 4px;padding-left:9px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--pt-fg2)}
+      .ptap-logrow b.bad{color:var(--pt-bad)}.ptap-logrow b.warn{color:var(--pt-warn)}.ptap-logrow b.ok{color:var(--pt-ok)}
       .ptap-col{display:flex;flex-direction:column;gap:12px;min-width:0}
       .ptap-card{border:1px solid var(--pt-line);border-radius:10px;background:var(--pt-bg);min-width:0}
       .ptap-cardhead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--pt-line)}
@@ -101,10 +113,17 @@ window.__ModuleLoader__.load({
 
     const STATUS_TEXT = { ready: '已登录', auth_required: '需重登' };
     const TASK_TEXT = { pending: '待做', running: '执行中', done: '完成', failed: '失败', cancelled: '已取消' };
+    const REASON_TEXT = {
+      auth_required: '登录失效', not_started: '未开放', exam_guard: '考试类', invalid_input: '参数错误', rate_limited: '限流',
+      compile_error: '编译错误', wrong_answer: '答案错误', timeout: '心跳超时', no_finish: '未收尾', session_error: '会话异常',
+      launch_failed: '启动失败', other: '其他',
+    };
+    const LOG_KIND = { failed: 'bad', pause: 'bad', retry: 'warn', recover: 'warn', done: 'ok', resume: 'ok' };
+    const CELL_TEXT = { ok: '已通过', partial: '部分正确', wrong: '答案错误', todo: '未做' };
     const TASK_CHIP = { pending: '', running: 'run', done: 'ok', failed: 'bad', cancelled: '' };
     const LOG_TEXT = {
       enqueue: '入队', start: '开始', progress: '进度', done: '完成', retry: '重试', failed: '失败', cancel: '取消',
-      requeue: '重排', bump: '插队', clear: '清理', recover: '恢复', migrate: '迁移',
+      requeue: '重排', bump: '插队', clear: '清理', recover: '恢复', migrate: '迁移', pause: '暂停', resume: '继续',
     };
     const dateText = (value) => (value ? String(value).replace('T', ' ').slice(5, 16) : '-');
     const timeText = (value) => {
@@ -144,6 +163,10 @@ window.__ModuleLoader__.load({
       const [form, setForm] = useState({ label: '', login: '', password: '', cookie: '' });
       const [relogin, setRelogin] = useState(null);
       const [queueTab, setQueueTab] = useState('active');
+      const [setFilter, setSetFilter] = useState('all');
+      const [openSet, setOpenSet] = useState('');
+      const [openTask, setOpenTask] = useState('');
+      const [logFilter, setLogFilter] = useState('all');
       const capRef = useRef({});
       const mounted = useRef(true);
       useEffect(() => () => { mounted.current = false; }, []);
@@ -307,35 +330,42 @@ window.__ModuleLoader__.load({
       });
 
       // ── KPI ──
+      const single = accounts.length <= 1;
       const totals = (sets ?? []).reduce((acc, row) => {
         if (row.total > 0) { acc.total += row.total; acc.todo += row.todo; }
         if (row.todo > 0 && row.daysLeft !== null && row.daysLeft <= 3) acc.urgent += 1;
         return acc;
       }, { total: 0, todo: 0, urgent: 0 });
       const readyCount = accounts.filter((row) => row.status === 'ready').length;
+      const today = new Date().toDateString();
+      const doneToday = tasks.filter((task) => task.status === 'done' && task.finishedAt && new Date(task.finishedAt).toDateString() === today).length;
 
+      const kpi = (value, label, style) => h('div', { className: 'ptap-kpi' }, h('b', { style }, value), h('span', null, label));
       const kpis = h('div', { className: 'ptap-kpis' },
-        h('div', { className: 'ptap-kpi' }, h('b', null, `${readyCount}/${accounts.length}`), h('span', null, '账号已登录')),
-        h('div', { className: 'ptap-kpi' }, h('b', null, sets ? `${pct(totals.total - totals.todo, totals.total)}%` : '—'), h('span', null, sets ? `完成度 · 剩 ${totals.todo} 题` : '完成度')),
-        h('div', { className: 'ptap-kpi' }, h('b', { style: totals.urgent ? { color: 'var(--pt-bad)' } : null }, sets ? totals.urgent : '—'), h('span', null, '3 天内截止未完成')),
-        h('div', { className: 'ptap-kpi' }, h('b', null, `${counts.running}/${board?.limits?.maxConcurrent ?? 2}`), h('span', null, `执行中 · 待做 ${counts.pending}`)),
-        h('div', { className: 'ptap-kpi' }, h('b', null, counts.done), h('span', null, `已完成任务 · 失败 ${counts.failed}`)));
+        single ? null : kpi(`${readyCount}/${accounts.length}`, '账号已登录'),
+        kpi(sets ? `${pct(totals.total - totals.todo, totals.total)}%` : '—', sets ? `完成度 · 剩 ${totals.todo} 题` : '完成度'),
+        kpi(sets ? totals.urgent : '—', '3 天内截止未完成', totals.urgent ? { color: 'var(--pt-bad)' } : null),
+        kpi(`${counts.running}/${board?.limits?.maxConcurrent ?? 2}`, `执行中 · 待做 ${counts.pending}`),
+        kpi(doneToday, `今日完成任务 · 失败 ${counts.failed}`));
 
-      // ── 左栏：账号 ──
+      // ── 账号动作 ──
+      const accountActions = (account) => [
+        single ? null : h('button', { key: 'view', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setSetsAccount(account.id); void loadSets(account.id); } }, '看进度'),
+        account.id !== defaultAccount ? h('button', { key: 'def', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`default:${account.id}`, async () => { await call('accounts.default', { id: account.id }); return `默认账号已切到 ${account.label}`; }) }, '设为默认') : null,
+        h('button', { key: 'check', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`check:${account.id}`, async () => { const r = await call('accounts.check', { id: account.id }); return `校验通过：${r?.account?.nickname || ''}`; }) }, busy === `check:${account.id}` ? '校验中…' : '校验'),
+        h('button', { key: 'relogin', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setRelogin({ id: account.id, label: account.label, password: '' }); setError(''); } }, '重登'),
+        h('button', { key: 'rm', className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => { if (window.confirm(`删除账号「${account.label}」及其凭据？\n队列里这个账号的任务不会自动删除。`)) void run(`remove:${account.id}`, async () => { await call('accounts.remove', { id: account.id }); return '已删除（凭据一并删除）'; }); } }, '删除'),
+      ];
+      const statusChip = (account) => h(Chip, { kind: account.status === 'ready' ? 'ok' : 'bad' }, STATUS_TEXT[account.status] ?? account.status);
+
       const accountRows = accounts.length === 0
-        ? h('div', { className: 'ptap-empty' }, '还没有账号。', h('br'), '点右上「添加」用账号密码登录。')
+        ? h('div', { className: 'ptap-empty' }, '还没有账号。', h('br'), '点「添加」用账号密码登录，或粘贴 PTASession。')
         : accounts.map((account) => h('div', { className: 'ptap-row', key: account.id },
           h('div', { className: 'ptap-grow' },
             h('div', { className: 'ptap-name', title: account.label }, account.label, account.id === defaultAccount ? h('span', { className: 'ptap-count' }, ' · 默认') : null),
-            h('div', { className: 'ptap-mono' }, `${account.nickname || '未校验'} · ${account.id.slice(0, 8)}`),
-            h('div', { className: 'ptap-actions', style: { marginTop: 4 } },
-              h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setSetsAccount(account.id); void loadSets(account.id); } }, '看进度'),
-              account.id !== defaultAccount ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`default:${account.id}`, async () => { await call('accounts.default', { id: account.id }); return `默认账号已切到 ${account.label}`; }) }, '设为默认') : null,
-              h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`check:${account.id}`, async () => { const r = await call('accounts.check', { id: account.id }); return `校验通过：${r?.account?.nickname || ''}`; }) }, busy === `check:${account.id}` ? '校验中…' : '校验'),
-              h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setRelogin({ id: account.id, label: account.label, password: '' }); setError(''); } }, '重登'),
-              h('button', { className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => { if (window.confirm(`删除账号「${account.label}」及其凭据？`)) void run(`remove:${account.id}`, async () => { await call('accounts.remove', { id: account.id }); return '已删除（凭据一并删除）'; }); } }, '删除'))),
-          h(Chip, { kind: account.status === 'ready' ? 'ok' : 'bad' }, STATUS_TEXT[account.status] ?? account.status)));
-
+            h('div', { className: 'ptap-mono', title: account.id }, `${account.nickname || '未校验'} · ${account.id.slice(0, 8)}`),
+            h('div', { className: 'ptap-actions', style: { marginTop: 4 } }, accountActions(account))),
+          statusChip(account)));
       const reloginBox = relogin ? h('div', { className: 'ptap-cardbody ptap-collapse' },
         h('div', { className: 'ptap-label', style: { marginBottom: 8 } }, `重新登录 · ${relogin.label}`),
         h('div', { className: 'ptap-field' },
@@ -370,93 +400,161 @@ window.__ModuleLoader__.load({
           }, busy === 'add' ? '校验并保存…' : '添加账号'),
           mode === 'password' ? h('button', { className: 'ptap-btn', disabled: busy !== '' || !form.login.trim() || !form.password, onClick: () => solveCaptcha(add) }, '滑块后登录') : null)) : null;
 
+      const addToggle = h('button', { className: 'ptap-btn', onClick: () => setShowAdd(!showAdd) }, showAdd ? '收起' : (single && accounts.length ? '添加账号' : '添加'));
       const accountCard = h('div', { className: 'ptap-card' },
         h('div', { className: 'ptap-cardhead' },
           h('div', { className: 'ptap-label' }, '账号'),
           h('span', { className: 'ptap-count' }, accounts.length),
           h('div', { className: 'ptap-sp' }),
-          h('button', { className: 'ptap-btn', onClick: () => setShowAdd(!showAdd) }, showAdd ? '收起' : '添加')),
+          addToggle),
         h('div', { className: 'ptap-cardbody' }, accountRows),
         reloginBox,
         addBox);
 
-      // ── 中栏：题目集完成度 ──
+      // 单账号：账号收成一条横条，不占一整栏
+      const only = accounts[0];
+      const accountBar = h('div', { className: 'ptap-card' },
+        only
+          ? h('div', { className: 'ptap-accbar' },
+            h('div', { className: 'ptap-grow' },
+              h('div', { className: 'ptap-name', title: only.label }, only.label),
+              h('div', { className: 'ptap-mono', title: only.id }, `${only.nickname || '未校验'} · ${only.id.slice(0, 8)}`)),
+            statusChip(only),
+            h('div', { className: 'ptap-actions' }, accountActions(only)),
+            addToggle)
+          : h('div', { className: 'ptap-accbar' },
+            h('div', { className: 'ptap-grow' }, h('div', { className: 'ptap-name' }, '还没有绑定 PTA 账号'), h('div', { className: 'ptap-hint' }, '账号密码直登，或粘贴 PTASession；凭据只进 DSH 凭据服务。')),
+            addToggle),
+        reloginBox,
+        addBox);
+
+      // ── 队列暂停提示（登录失效）──
+      const paused = Object.entries(board?.paused ?? {});
+      const pausedBanner = paused.length ? h('div', { className: 'ptap-msg err' },
+        h('div', { className: 'ptap-grow' }, paused.map(([id, row]) => `账号「${accounts.find((a) => a.id === id)?.label ?? id.slice(0, 8)}」${REASON_TEXT[row.reason] ?? row.reason}，它的任务已暂停；重登成功后自动继续。`).join('\n')),
+        h('div', { className: 'ptap-actions' },
+          h('button', { className: 'ptap-btn', disabled: busy !== '', onClick: () => { const [id] = paused[0]; const row = accounts.find((a) => a.id === id); setRelogin({ id, label: row?.label ?? id, password: '' }); } }, '重登'),
+          h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run('resume', async () => { await call('tasks.resume', { account: paused[0][0] }); return '队列已继续'; }) }, '直接继续'))) : null;
+
+      // ── 题目集完成度 ──
       const viewLabel = accounts.find((row) => row.id === viewAccount)?.label ?? '';
+      const unfinished = (sets ?? []).filter((row) => row.total >= 0 && row.todo > 0);
+      const finishedCount = (sets ?? []).filter((row) => row.total >= 0 && row.todo === 0).length;
+      const openCount = (sets ?? []).filter((row) => row.total >= 0).length;
+      const shownSets = setFilter === 'todo' ? unfinished : (sets ?? []);
+      const skeleton = h('div', null, [0, 1, 2].map((i) => h('div', { className: 'ptap-set', key: i },
+        h('div', { className: 'ptap-skel', style: { width: `${55 - i * 10}%` } }),
+        h('div', { className: 'ptap-skel', style: { height: 6 } }),
+        h('div', { className: 'ptap-skel', style: { width: '35%', height: 9 } }))));
+      const setRow = (row) => {
+        const done = row.total > 0 ? row.total - row.todo : 0;
+        const blocked = row.total < 0;
+        const finished = !blocked && row.todo === 0;
+        const urgent = !finished && !blocked && row.daysLeft !== null && row.daysLeft <= 3;
+        const task = activeTaskFor(row.id);
+        const live = task?.status === 'running';
+        const expanded = openSet === row.id && (row.cells?.length ?? 0) > 0;
+        return h('div', { className: 'ptap-set', key: row.id },
+          h('div', { className: 'ptap-setline' },
+            h('button', { className: 'ptap-link ptap-grow', title: row.cells?.length ? '展开每题状态' : row.name, onClick: () => setOpenSet(openSet === row.id ? '' : row.id) },
+              h('div', { className: 'ptap-name' }, row.name)),
+            row.exam ? h(Chip, { kind: 'warn' }, '考试') : null,
+            blocked ? h(Chip, null, '未开放')
+              : finished ? h(Chip, { kind: 'ok' }, '已完成')
+                : task ? h(Chip, { kind: live ? 'run' : '', dot: live }, live ? `执行中 ${task.progress.total ? `${task.progress.done}/${task.progress.total}` : ''}` : '排队中')
+                  : h('button', { className: 'ptap-btn primary', disabled: busy !== '', onClick: () => dispatch(row) }, busy === `dispatch:${row.id}` ? '派发中…' : '一键完成')),
+          blocked
+            ? h('div', { className: 'ptap-hint' }, '题目集未开始、已结束或当前账号没有权限，暂时不能派发。')
+            : h('div', { className: 'ptap-setline' },
+              h(Bar, { value: row.total > 0 ? pct(done, row.total) : 0, kind: finished ? '' : live ? 'run' : urgent ? 'bad' : 'warn' }),
+              h('span', { className: 'ptap-count', style: { minWidth: 54, textAlign: 'right' } }, `${done}/${row.total}`)),
+          expanded ? h('div', { className: 'ptap-cells' }, row.cells.map((cell, index) => h('i', {
+            key: index, className: `ptap-cell ${cell.state === 'todo' ? '' : cell.state}`, title: `第 ${index + 1} 题 · ${CELL_TEXT[cell.state] ?? cell.state}`,
+          }))) : null,
+          h('div', { className: 'ptap-meta' },
+            h('span', { className: 'ptap-mono', title: row.id }, `…${String(row.id).slice(-6)}`),
+            h('span', { className: urgent ? 'bad' : '' }, row.daysLeft === null ? '无截止' : row.daysLeft < 0 ? '已截止' : `剩 ${row.daysLeft} 天`),
+            h('span', null, `截止 ${dateText(row.endAt)}`)));
+      };
       const setList = !sets
-        ? h('div', { className: 'ptap-empty' }, accounts.length ? '加载中…' : '添加账号后这里显示各题目集完成度。')
+        ? (accounts.length ? skeleton : h('div', { className: 'ptap-empty' }, '添加账号后，这里显示每个题目集的完成度。'))
         : sets.length === 0
-          ? h('div', { className: 'ptap-empty' }, '没有未结束的题目集。')
-          : sets.map((row) => {
-            const done = row.total > 0 ? row.total - row.todo : 0;
-            const finished = row.total >= 0 && row.todo === 0;
-            const urgent = !finished && row.daysLeft !== null && row.daysLeft <= 3;
-            const task = activeTaskFor(row.id);
-            const live = task?.status === 'running';
-            return h('div', { className: 'ptap-set', key: row.id },
-              h('div', { className: 'ptap-setline' },
-                h('div', { className: 'ptap-grow' }, h('div', { className: 'ptap-name', title: row.name }, row.name)),
-                row.exam ? h(Chip, { kind: 'warn' }, '考试') : null,
-                finished ? h(Chip, { kind: 'ok' }, '已完成')
-                  : task ? h(Chip, { kind: live ? 'run' : '', dot: live }, live ? `执行中 ${task.progress.total ? `${task.progress.done}/${task.progress.total}` : ''}` : '排队中')
-                    : h('button', { className: 'ptap-btn primary', disabled: busy !== '' || row.total < 0, onClick: () => dispatch(row) }, busy === `dispatch:${row.id}` ? '派发中…' : '一键完成')),
-              h('div', { className: 'ptap-setline' },
-                h(Bar, { value: row.total > 0 ? pct(done, row.total) : 0, kind: finished ? '' : live ? 'run' : urgent ? 'bad' : 'warn' }),
-                h('span', { className: 'ptap-count', style: { minWidth: 54, textAlign: 'right' } }, row.total < 0 ? '无权限' : `${done}/${row.total}`)),
-              h('div', { className: 'ptap-meta' },
-                h('span', { className: 'ptap-mono' }, row.id),
-                h('span', { className: urgent ? 'bad' : '' }, row.daysLeft === null ? '无截止' : row.daysLeft < 0 ? '已截止' : `剩 ${row.daysLeft} 天`),
-                h('span', null, `截止 ${dateText(row.endAt)}`)));
-          });
+          ? h('div', { className: 'ptap-empty' }, '没有未结束的题目集。', h('br'), '老师发布新题集后点「刷新」。')
+          : shownSets.length === 0
+            ? h('div', { className: 'ptap-empty' }, '全部完成了 🎉')
+            : shownSets.map(setRow);
 
       const setsCard = h(Card, {
         title: '题目集完成度',
-        count: viewLabel ? `· ${viewLabel}` : undefined,
+        count: !single && viewLabel ? `· ${viewLabel}` : (sets ? `${finishedCount}/${openCount} 完成` : undefined),
         extra: h('div', { className: 'ptap-actions' },
-          h('button', { className: 'ptap-btn', disabled: busy !== '' || !sets?.some((row) => row.todo > 0 && !row.exam && !activeTaskFor(row.id)), onClick: dispatchAll }, busy === 'dispatchAll' ? '派发中…' : '全部完成'),
+          sets?.length ? h('div', { className: 'ptap-tabs' },
+            h('button', { className: 'ptap-tab', 'data-on': String(setFilter === 'all'), onClick: () => setSetFilter('all') }, '全部'),
+            h('button', { className: 'ptap-tab', 'data-on': String(setFilter === 'todo'), onClick: () => setSetFilter('todo') }, `未完成 ${unfinished.length}`)) : null,
+          h('button', { className: 'ptap-btn', disabled: busy !== '' || !sets?.some((row) => row.todo > 0 && row.total >= 0 && !row.exam && !activeTaskFor(row.id)), onClick: dispatchAll }, busy === 'dispatchAll' ? '派发中…' : '全部完成'),
           h('button', { className: 'ptap-btn', disabled: busy !== '' || !accounts.length, onClick: () => loadSets(viewAccount || null) }, busy === 'sets' ? '刷新中…' : '刷新')),
       }, setList);
 
-      // ── 右栏：任务队列 + 操作日志 ──
-      const tabs = [['active', `进行 ${counts.running + counts.pending}`], ['done', `完成 ${counts.done}`], ['failed', `失败 ${counts.failed + counts.cancelled}`]];
-      const visible = tasks.filter((task) => (queueTab === 'active' ? task.status === 'running' || task.status === 'pending'
-        : queueTab === 'done' ? task.status === 'done' : task.status === 'failed' || task.status === 'cancelled'));
+      // ── 任务队列 ──
+      const events = board?.events ?? [];
+      const tabs = [['active', `进行 ${counts.running + counts.pending}`], ['done', `完成 ${counts.done}`], ['failed', `失败 ${counts.failed}`], ['cancelled', `已取消 ${counts.cancelled}`]];
+      const visible = tasks.filter((task) => (queueTab === 'active' ? task.status === 'running' || task.status === 'pending' : task.status === queueTab));
 
       const taskCard = (task) => {
         const progress = task.progress ?? { done: 0, total: 0, note: '' };
+        const timeline = openTask === task.id ? events.filter((event) => event.task === task.id).slice(0, 12) : [];
         return h('div', { className: `ptap-task ${task.status}`, key: task.id },
           h('div', { className: 'ptap-setline' },
             h('div', { className: 'ptap-grow' },
               h('div', { className: 'ptap-name', title: task.setName }, task.setName || `题目集 ${task.psid}`),
-              h('div', { className: 'ptap-mono' }, `${task.accountLabel || task.account.slice(0, 8)} · 第 ${task.attempts}/${task.maxAttempts} 次`)),
+              h('div', { className: 'ptap-mono' }, `${single ? '' : `${task.accountLabel || task.account.slice(0, 8)} · `}第 ${task.attempts}/${task.maxAttempts} 次`)),
+            task.reason && task.status !== 'done' ? h(Chip, { kind: 'warn' }, REASON_TEXT[task.reason] ?? task.reason) : null,
             h(Chip, { kind: TASK_CHIP[task.status], dot: task.status === 'running' }, TASK_TEXT[task.status] ?? task.status)),
           task.status === 'running' || (task.status === 'done' && progress.total) ? h('div', { className: 'ptap-setline' },
             h(Bar, { value: pct(progress.done, progress.total), kind: task.status === 'running' ? 'run' : '' }),
             h('span', { className: 'ptap-count' }, progress.total ? `${progress.done}/${progress.total}` : '—')) : null,
           progress.note || task.error ? h('div', { className: 'ptap-hint', style: task.error ? { color: 'var(--pt-bad)' } : null }, task.error || progress.note) : null,
           task.status === 'pending' && task.nextRunAt ? h('div', { className: 'ptap-hint' }, `退避中，${timeText(task.nextRunAt)} 自动重试`) : null,
+          timeline.length ? h('div', { className: 'ptap-timeline' }, timeline.map((event, index) => h('div', { key: index }, `${timeText(event.at)} ${LOG_TEXT[event.kind] ?? event.kind} · ${event.message}`))) : null,
           h('div', { className: 'ptap-actions' },
             task.status === 'pending' && launch.available ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => taskAction('tasks.start', task, '已启动') }, '立即执行') : null,
             task.status === 'pending' ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => taskAction('tasks.bump', task, '已插队到最前') }, '插队') : null,
             task.sessionId && openSession ? h('button', { className: 'ptap-btn ghost', onClick: () => openSession(task.sessionId) }, '打开会话') : null,
             task.status === 'failed' || task.status === 'cancelled' ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => taskAction('tasks.retry', task, '已重新排队') }, '重试') : null,
-            task.status === 'pending' || task.status === 'running' ? h('button', { className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => taskAction('tasks.cancel', task, '已取消') }, '取消') : null));
+            h('button', { className: 'ptap-btn ghost', onClick: () => setOpenTask(openTask === task.id ? '' : task.id) }, openTask === task.id ? '收起' : '详情'),
+            task.status === 'pending' || task.status === 'running' ? h('button', { className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => { if (task.status !== 'running' || window.confirm('任务正在执行，确定取消？已提交的题不会撤回。')) void taskAction('tasks.cancel', task, '已取消'); } }, '取消') : null));
       };
 
       const queueCard = h(Card, {
         title: '任务队列',
         extra: h('div', { className: 'ptap-actions' },
           h('div', { className: 'ptap-tabs' }, tabs.map(([key, label]) => h('button', { key, className: 'ptap-tab', 'data-on': String(queueTab === key), onClick: () => setQueueTab(key) }, label))),
-          queueTab !== 'active' && visible.length ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run('clear', async () => { const r = await call('tasks.clear'); return `已清理 ${r.removed} 个`; }) }, '清理') : null),
+          queueTab !== 'active' && visible.length ? h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run('clear', async () => { const r = await call('tasks.clear', { status: queueTab }); return `已清理 ${r.removed} 个`; }) }, '清理') : null),
       },
       !launch.available ? h('div', { className: 'ptap-msg info', style: { marginBottom: 8 } }, '当前 DSH 不支持插件直接开会话：派发后在对话里说「执行 PTA 任务」。') : null,
-      visible.length ? visible.map(taskCard) : h('div', { className: 'ptap-empty' }, queueTab === 'active' ? '没有进行中的任务。点中间的「一键完成」派发。' : '暂无。'));
+      visible.length ? visible.map(taskCard) : h('div', { className: 'ptap-empty' }, queueTab === 'active' ? '没有进行中的任务。点左侧的「一键完成」派发。' : '暂无。'));
 
-      const events = board?.events ?? [];
-      const logCard = h(Card, { title: '操作日志', count: events.length || undefined },
-        events.length ? h('div', { className: 'ptap-log' }, events.slice(0, 40).map((event, index) => h('div', { className: 'ptap-logrow', key: `${event.at}-${index}` },
-          h('time', null, timeText(event.at)),
-          h('div', null, h('b', null, LOG_TEXT[event.kind] ?? event.kind), ' ', event.message))))
-          : h('div', { className: 'ptap-empty' }, '暂无记录。'));
+      // ── 操作日志 ──
+      const shownEvents = logFilter === 'issue' ? events.filter((event) => LOG_KIND[event.kind] === 'bad' || LOG_KIND[event.kind] === 'warn') : events;
+      const copyLog = () => {
+        const lines = shownEvents.map((event) => `${event.at} ${LOG_TEXT[event.kind] ?? event.kind} ${event.message}`).join('\n');
+        Promise.resolve(navigator.clipboard?.writeText?.(lines))
+          .then(() => setNotice(`已复制 ${shownEvents.length} 条日志（不含任何凭据）`))
+          .catch(() => setError('复制失败：浏览器不允许访问剪贴板'));
+      };
+      const logCard = h(Card, {
+        title: '操作日志',
+        count: events.length || undefined,
+        extra: events.length ? h('div', { className: 'ptap-actions' },
+          h('div', { className: 'ptap-tabs' },
+            h('button', { className: 'ptap-tab', 'data-on': String(logFilter === 'all'), onClick: () => setLogFilter('all') }, '全部'),
+            h('button', { className: 'ptap-tab', 'data-on': String(logFilter === 'issue'), onClick: () => setLogFilter('issue') }, '异常')),
+          h('button', { className: 'ptap-btn ghost', onClick: copyLog }, '复制')) : null,
+      },
+      shownEvents.length ? h('div', { className: 'ptap-log' }, shownEvents.slice(0, 40).map((event, index) => h('div', { className: 'ptap-logrow', key: `${event.at}-${index}` },
+        h('time', null, timeText(event.at)),
+        h('div', null, h('b', { className: LOG_KIND[event.kind] ?? '' }, LOG_TEXT[event.kind] ?? event.kind), ' ', event.message))))
+        : h('div', { className: 'ptap-empty' }, logFilter === 'issue' ? '没有异常。' : '暂无记录。'));
 
       return h('div', { className: 'ptap' },
         h('div', { className: 'ptap-head' },
@@ -468,11 +566,17 @@ window.__ModuleLoader__.load({
           close ? h('button', { className: 'ptap-btn', onClick: close }, '关闭') : null),
         error ? h('div', { className: 'ptap-msg err' }, error) : null,
         notice ? h('div', { className: 'ptap-msg ok' }, notice) : null,
+        pausedBanner,
+        single ? accountBar : null,
         kpis,
-        h('div', { className: 'ptap-grid' },
-          h('div', { className: 'ptap-col' }, accountCard),
-          h('div', { className: 'ptap-col' }, setsCard),
-          h('div', { className: 'ptap-col ptap-col-q' }, queueCard, logCard)));
+        single
+          ? h('div', { className: 'ptap-grid single' },
+            h('div', { className: 'ptap-col' }, setsCard),
+            h('div', { className: 'ptap-col ptap-col-q' }, queueCard, logCard))
+          : h('div', { className: 'ptap-grid' },
+            h('div', { className: 'ptap-col' }, accountCard),
+            h('div', { className: 'ptap-col' }, setsCard),
+            h('div', { className: 'ptap-col ptap-col-q' }, queueCard, logCard)));
     }
 
     function Icon({ size = 16 }) {

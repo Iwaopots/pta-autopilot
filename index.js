@@ -8,6 +8,7 @@
  *   · 状态落盘：题目、答案、待办写在本插件自己的 state 目录，工具只回摘要。
  *   · 面板输入：/dsh-pta/api 由 Web 面板调用，Cookie 从表单直达凭据服务，不经过模型。
  */
+import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -24,7 +25,14 @@ const API_PATH = '/dsh-pta/api';
 const MAX_BODY = 512 * 1024;
 /** HTTP 契约版本：只加不改；破坏性改动才升。 */
 export const API_VERSION = 1;
-const PKG_VERSION = '0.3.0';
+/** 版本号只从 package.json 读，避免手写常量与发布版本不一致（v0.3.1 的 ping 仍报 0.3.0 就是这个原因）。 */
+export const PKG_VERSION = (() => {
+  try {
+    return String(JSON.parse(readFileSync(join(PKG_ROOT, 'package.json'), 'utf8')).version ?? '0.0.0');
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 const ERRORS = {
   invalid_input: [400, '请求参数无效。'],
@@ -323,15 +331,16 @@ function toolsFor(service) {
     },
     {
       name: 'pta_finish',
-      description: '把任务标记为完成（done）或失败（failed）。failed 且未用尽 3 次会自动指数退避后重试；收尾前先用 pta_status 复核。',
+      description: '把任务标记为完成（done）或失败（failed）。failed 按 reason 分类处理：登录失效 / 题集未开放不重试（登录失效还会暂停该账号队列），限流长退避，其余未用尽次数时指数退避后重试；收尾前先用 pta_status 复核。',
       parameters: {
         id: { type: 'string', required: true, description: '任务 id（pta_tasks 返回）' },
         status: { type: 'string', description: 'done | failed，默认 done' },
         error: { type: 'string', description: 'failed 时写明原因' },
+        reason: { type: 'string', description: 'failed 时的原因分类：auth_required | rate_limited | not_started | compile_error | wrong_answer | other。auth_required / not_started 不会重试' },
       },
       output,
       async execute(args) {
-        const data = await service.finishTask({ id: args?.id, status: args?.status === 'failed' ? 'failed' : 'done', error: args?.error });
+        const data = await service.finishTask({ id: args?.id, status: args?.status === 'failed' ? 'failed' : 'done', error: args?.error, reason: args?.reason });
         const tail = data.task.status === 'pending' ? `（将于 ${String(data.task.nextRunAt).slice(11, 19)} 自动重试）` : '';
         return { text: `任务 ${data.task.id} → ${data.task.status}${tail}`, ...data };
       },
@@ -479,7 +488,9 @@ async function dispatch(service, input) {
     case 'tasks.bump':
       return service.bumpTask({ id: input.id });
     case 'tasks.clear':
-      return service.clearTasks();
+      return service.clearTasks({ status: typeof input.status === 'string' ? input.status : undefined });
+    case 'tasks.resume':
+      return service.resumeQueue({ account: input.account });
     default:
       throw Object.assign(new Error(`不认识的 action：${action}`), { code: 'invalid_input' });
   }

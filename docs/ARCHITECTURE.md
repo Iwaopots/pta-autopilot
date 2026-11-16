@@ -11,7 +11,8 @@ index.js                  ← DSH 适配层：路由 / 工具 / Skill 同步 / �
   │
 lib/launcher.js           ← DSH 会话端口：sessionController / agents 能力探测 → 开会话 → followup
   │  （以 port 形式注入 service；缺能力时 available=false，其余功能照常）
-lib/service.js            ← 用例层：账号动作、完成度、拉题、判题、派发 / 调度泵（不 import DSH）
+lib/service.js            ← 用例层：账号动作、完成度、拉题、判题（不 import DSH）
+  ├── lib/orchestrator.js ← 任务编排：派发 / 调度泵 / 开会话 / 收尾 / 队列视图（v0.4 从 service 拆出）
   ├── lib/scheduler.js    ← 任务队列：账号锁 / 并发上限 / 临期优先 / 退避重试 / 崩溃恢复 / 操作日志（纯 Node）
   ├── lib/accounts.js     ← 账号目录：accounts.json 元数据 + 凭据端口（ctx.credentials）
   └── lib/pta.js          ← 协议层：pintia HTTP、题型、脱敏、密码登录（纯函数 + fetch）
@@ -40,6 +41,19 @@ lib/service.js            ← 用例层：账号动作、完成度、拉题、�
 - 崩溃恢复：每 60s 一次节拍，`running` 超过 20 分钟无心跳 → 按失败处理（进入重试）。
 - 红线：考试类题集（`isExamSet`）`dispatch` 默认拒绝（`exam_guard`），`dispatch.all` 直接跳过；模型指令里也要求遇到考试类立即停止。
 
+### 失败分类（v0.4）
+
+`pta_finish` / 会话收尾带 `reason`，调度器按 `FAILURE_POLICY` 处理：
+
+| reason | 重试 | 其他 |
+| --- | --- | --- |
+| `auth_required` | 否 | 暂停该账号队列，面板重登 / 校验通过后自动 `resume` |
+| `not_started` / `exam_guard` / `invalid_input` | 否 | — |
+| `rate_limited` | 是 | 退避 ×4，至少 5 分钟 |
+| `compile_error` / `wrong_answer` / `timeout` / `no_finish` / `session_error` / `launch_failed` / `other` | 是 | 普通指数退避 |
+
+没给 reason 时从 error 文本推断（`classifyFailure`）。重试时指令带上次失败原因，并要求先 `pta_status` 只做 todo，避免重复提交。
+
 ## 3. 稳定性与版本策略
 
 1. **HTTP 契约版本化**：响应带 `apiVersion: 1`；动作只加不改。v0.3 新增 `dispatch.all / tasks.board / tasks.start / tasks.cancel / tasks.retry / tasks.bump / tasks.clear`，`dispatch` 只加了可选参数。
@@ -51,7 +65,8 @@ lib/service.js            ← 用例层：账号动作、完成度、拉题、�
    - `test/smoke.mjs`：装配、11 个工具、路由、ping 无工具错误、凭据读写、错误映射；
    - `test/scheduler.mjs`：调度器全部规则 + 一键完成端到端（假 sessionController）；
    - `test/client-contract.mjs`：slot 契约；
-   - `test/panel-render.mjs`：jsdom + 真 React 渲染面板、点击派发（缺依赖自动跳过）；
+   - `test/panel-render.mjs`：jsdom + 真 React 渲染面板（单账号 / 多账号布局、展开题目格、队列分页、日志筛选、暂停提示），缺依赖**直接失败**；
+   - `scripts/gate.mjs`：一条命令跑语法 + 全部测试（skip 算红）+ 版本一致 + 本机 ping，CI 用 `--offline`；
    - `test/live-probe.mjs`：真实协议 + 脱敏（需联网）。
 7. **文件编码**：所有源码 UTF-8 **无 BOM**、LF。提交给 PTA 的源码经 `normalizeSource` 去 BOM / CRLF。
 
@@ -60,14 +75,17 @@ lib/service.js            ← 用例层：账号动作、完成度、拉题、�
 ```
 dsh-pta/
 ├── index.js            DSH 适配层
-├── client.js           面板（三栏：账号｜完成度｜任务队列 + 操作日志）
+├── client.js           面板（单账号两栏 / 多账号三栏：账号｜完成度｜任务队列 + 操作日志）
 ├── lib/pta.js          协议层
 ├── lib/accounts.js     账号目录 + 凭据端口
 ├── lib/scheduler.js    任务调度器
 ├── lib/launcher.js     DSH 会话启动器
 ├── lib/service.js      用例层
+├── lib/orchestrator.js 任务编排
 ├── vendor/pta-cli/     第三方 CLI 快照（可整体删除）
 ├── skills/pta-cli/     原生 Skill
 ├── test/               回归测试
+├── scripts/            gate.mjs 发版闸门 / release.mjs 一键发版 / checks-all.ps1 Windows 包装
+├── .github/workflows/  CI（push / PR 跑 gate --offline）
 └── docs/               DETAIL + 本文件
 ```

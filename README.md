@@ -44,17 +44,27 @@ plugin_manager install_bundle target=<本目录绝对路径>
 
 ## 验证
 
-1. `npm test`（或逐个 `node test/*.mjs`）全过；面板渲染测试需 `npm i --no-save react@18 react-dom@18 jsdom@24`，缺依赖会自动跳过。
+1. 先 `npm install`（只装测试用的 devDependencies：react / react-dom / jsdom，插件运行时不需要），再跑发版闸门 `npm run gate`（不在本机 DSH 上用 `npm run gate:offline`），最后一行必须是 `ALL GREEN`。面板渲染测试缺依赖会**失败**而不是跳过。Windows 也可以 `pwsh -File scripts\checks-all.ps1`。
 2. 重装后 `/_pta/ping`：`tools` 11 个、`toolErrors: []`，`launch.available` 为 `true` 表示「一键完成」可直达模型。
 3. 面板顶部显示「一键直达模型」；点某题集「一键完成」→ 会话列表出现「PTA · 题集名」→ 右侧队列走到「完成」。
 4. `~/.dsh/skills/pta-cli/SKILL.md` 已同步。
+
+## 发版
+
+```
+# 1. 在 CHANGELOG.md 顶部写好 "## x.y.z — 日期"
+# 2. 提交改动后：
+npm run release -- x.y.z
+```
+
+脚本会改版本号 → 跑闸门 → commit → tag → 推送（失败重试 3 次）→ 校验远端 tag。只做普通推送。升级注意事项见 `docs/UPGRADING.md`。
 
 ## 配置（cordis.patch.yml）
 
 | 键 | 默认 | 说明 |
 | --- | --- | --- |
 | `maxConcurrent` | 2 | 全局同时执行的任务数（同账号始终串行） |
-| `maxAttempts` | 3 | 单任务最多尝试次数（失败指数退避 30s 起，上限 15min） |
+| `maxAttempts` | 3 | 单任务最多尝试次数（失败指数退避 30s 起，上限 15min；限流至少 5min；登录失效 / 题集未开放不重试） |
 | `autoLaunch` | true | 设为 false 则只排队，不自动开会话 |
 
 ## Python 离线兜底

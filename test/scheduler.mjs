@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backoffMs, createScheduler } from '../lib/scheduler.js';
+import { backoffMs, classifyFailure, createScheduler } from '../lib/scheduler.js';
 import { createLauncher } from '../lib/launcher.js';
 import { buildTaskPrompt, createService, normalizeSource } from '../lib/service.js';
 
@@ -236,6 +236,71 @@ try {
     assert.equal(ok.created, true);
     assert.equal(ok.launch.available, false);
     service.close();
+  });
+
+  await check('失败分类：登录失效不重试并暂停账号，重登 resume 后继续', async () => {
+    let clock = Date.parse('2026-11-16T00:00:00Z');
+    const s = createScheduler({ stateDir: await fresh(), maxConcurrent: 2, now: () => clock });
+    await s.enqueue({ psid: '1', account: 'a' });
+    await s.enqueue({ psid: '2', account: 'a' });
+    const { task } = await s.claim();
+    await s.finish({ id: task.id, status: 'failed', reason: 'auth_required', error: 'PTA 登录已失效' });
+    const failed = await s.get(task.id);
+    assert.equal(failed.status, 'failed', '登录失效不应自动重试');
+    assert.equal(failed.reason, 'auth_required');
+    const list = await s.list();
+    assert.ok(list.paused.a, '账号 a 应被暂停');
+    assert.equal((await s.claim()).task, null, '暂停中的账号不能领新任务');
+    assert.equal((await s.resume({ account: 'a' })).resumed, true);
+    assert.ok((await s.claim()).task, 'resume 后可以继续领');
+  });
+
+  await check('失败分类：限流长退避；未开放不重试；未知原因从文本推断', async () => {
+    const clock = Date.parse('2026-11-16T00:00:00Z');
+    const s = createScheduler({ stateDir: await fresh(), now: () => clock });
+    await s.enqueue({ psid: '1', account: 'a' });
+    await s.enqueue({ psid: '2', account: 'b' });
+    const first = (await s.claim()).task;
+    const second = (await s.claim()).task;
+    await s.finish({ id: first.id, status: 'failed', error: 'HTTP 429 限流' });
+    const limited = await s.get(first.id);
+    assert.equal(limited.reason, 'rate_limited');
+    assert.equal(limited.status, 'pending');
+    assert.ok(Date.parse(limited.nextRunAt) - clock >= 5 * 60_000, '限流至少退避 5 分钟');
+    await s.finish({ id: second.id, status: 'failed', reason: 'not_started', error: '没有权限' });
+    assert.equal((await s.get(second.id)).status, 'failed');
+    assert.equal(classifyFailure(undefined, 'error: compilation failed'), 'compile_error');
+    assert.equal(classifyFailure('bogus', ''), 'other');
+    assert.ok(backoffMs(1, 30_000, undefined, 'rate_limited') >= 5 * 60_000);
+  });
+
+  await check('重试时带上次失败原因，并要求先查 todo 防重复提交', async () => {
+    let clock = Date.parse('2026-11-16T00:00:00Z');
+    const s = createScheduler({ stateDir: await fresh(), backoffBaseMs: 1000, now: () => clock });
+    await s.enqueue({ psid: '1', account: 'a', setName: '算法' });
+    const first = (await s.claim()).task;
+    await s.finish({ id: first.id, status: 'failed', reason: 'wrong_answer', error: '7-3 答案错误' });
+    clock += 60_000;
+    const again = (await s.claim()).task;
+    assert.equal(again.attempts, 2);
+    assert.match(again.lastError, /7-3/u);
+    const prompt = buildTaskPrompt(again, 'A');
+    assert.match(prompt, /第 2\/3 次/u);
+    assert.match(prompt, /不要重交/u);
+    assert.doesNotMatch(buildTaskPrompt({ ...again, attempts: 1 }, 'A'), /不要重交/u, '首次执行不加重试段');
+  });
+
+  await check('按状态清理：只清已取消，不动失败', async () => {
+    const s = createScheduler({ stateDir: await fresh() });
+    const a = (await s.enqueue({ psid: '1', account: 'a' })).task;
+    const b = (await s.enqueue({ psid: '2', account: 'b' })).task;
+    await s.cancel({ id: a.id });
+    const claimed = (await s.claim({ id: b.id })).task;
+    await s.finish({ id: claimed.id, status: 'failed', reason: 'not_started' });
+    const { removed } = await s.clearFinished({ status: 'cancelled' });
+    assert.equal(removed, 1);
+    assert.equal((await s.list()).tasks.length, 1);
+    assert.equal((await s.list()).tasks[0].status, 'failed');
   });
 
   console.log(`\n${passed} checks passed`);

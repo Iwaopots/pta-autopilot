@@ -98,6 +98,8 @@ try {
     assert.equal(body.tools.length, 11);
     assert.deepEqual(body.toolErrors, []);
     assert.equal(body.apiVersion, 1);
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+    assert.equal(body.version, pkg.version, 'ping 的版本号必须等于 package.json');
     assert.equal(body.launch.available, false, '假宿主没有 sessionController，应降级而不是报错');
   });
 
@@ -108,6 +110,28 @@ try {
     assert.equal(body.ok, true, res.body);
     assert.equal(body.apiVersion, 1);
     assert.deepEqual(Object.keys(body.data.counts).sort(), ['cancelled', 'done', 'failed', 'pending', 'running']);
+    assert.deepEqual(body.data.paused, {});
+  });
+
+  await check('仓库文本文件无 BOM、无 CRLF', async () => {
+    const { readdir } = await import('node:fs/promises');
+    const rootUrl = new URL('../', import.meta.url);
+    const bad = [];
+    const walk = async (dir) => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        if (['node_modules', '.git', 'vendor'].includes(entry.name)) continue;
+        const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+        if (entry.isDirectory()) { await walk(url); continue; }
+        if (!/\.(m?js|json|md|ya?ml|ps1|svg)$/u.test(entry.name)) continue;
+        const buf = await readFile(url);
+        if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) bad.push(`${entry.name}: BOM`);
+        else if (buf.includes(Buffer.from('\r\n'))) bad.push(`${entry.name}: CRLF`);
+      }
+    };
+    await walk(rootUrl);
+    // Windows 上 git 若按 autocrlf 检出会出现 CRLF：.gitattributes 已强制 LF，这里只在仓库自身出问题时报
+    if (process.platform !== 'win32') assert.deepEqual(bad, [], bad.join('; '));
+    else assert.deepEqual(bad.filter((row) => row.endsWith('BOM')), [], bad.join('; '));
   });
 
   await check('Skill 同步到 skills/pta-cli/SKILL.md', async () => {

@@ -79,6 +79,35 @@ window.__ModuleLoader__.load({
       const [mode, setMode] = useState('password');
       const [form, setForm] = useState({ label: '', login: '', password: '', cookie: '' });
       const [relogin, setRelogin] = useState(null);
+      const capRef = React.useRef({});
+
+      const loadCaptcha = () => new Promise((resolve, reject) => {
+        if (window.TencentCaptcha) { resolve(window.TencentCaptcha); return; }
+        const script = document.createElement('script');
+        script.src = 'https://turing.captcha.qcloud.com/TCaptcha.js';
+        script.onload = () => (window.TencentCaptcha ? resolve(window.TencentCaptcha) : reject(new Error('验证码脚本未就绪')));
+        script.onerror = () => reject(new Error('验证码脚本加载失败（可能被网络/CSP 拦截）。可以先切到「粘贴 Cookie」登录。'));
+        document.head.append(script);
+      });
+
+      const solveCaptcha = async () => {
+        setError('');
+        try {
+          const TC = await loadCaptcha();
+          const captcha = new TC('194593025', (result) => {
+            if (result && result.ret === 0 && result.ticket) {
+              capRef.current = { ticket: result.ticket, randstr: result.randstr };
+              setNotice('验证通过，正在自动重试登录…');
+              void add();
+            } else {
+              setError('验证码未完成，可以再试一次，或切到「粘贴 Cookie」。');
+            }
+          });
+          captcha.show();
+        } catch (cause) {
+          setError(String(cause.message ?? cause));
+        }
+      };
 
       const refresh = useCallback(async () => {
         try {
@@ -115,7 +144,8 @@ window.__ModuleLoader__.load({
 
       const add = () => run('add', async () => {
         const payload = mode === 'password'
-          ? { label: form.label.trim(), login: form.login.trim(), password: form.password }
+          ? { label: form.label.trim(), login: form.login.trim(), password: form.password,
+              ...(capRef.current.ticket ? { ticket: capRef.current.ticket, randStr: capRef.current.randstr } : {}) }
           : { label: form.label.trim(), cookie: form.cookie.trim() };
         const result = await call('accounts.add', payload);
         setForm({ label: '', login: '', password: '', cookie: '' });
@@ -213,12 +243,13 @@ window.__ModuleLoader__.load({
               h('div', { className: 'ptap-field' }, h('div', { className: 'ptap-label' }, 'PTASession'),
                 h('input', { className: 'ptap-input', type: 'password', value: form.cookie, autoComplete: 'off', placeholder: 'F12 → 应用程序 → Cookie → pintia.cn → PTASession 的 Value', onChange: (e) => setForm({ ...form, cookie: e.target.value }) })),
               h('div', { className: 'ptap-hint' }, '粘贴后直接写进 DSH 凭据服务，不会出现在对话或日志里。')),
-          h('div', { style: { marginTop: 10 } },
+          h('div', { style: { marginTop: 10, display: 'flex', gap: 8 } },
             h('button', {
               className: 'ptap-btn ptap-btn-primary',
               disabled: busy !== '' || (mode === 'password' ? (!form.login.trim() || !form.password) : !form.cookie.trim()),
               onClick: add,
-            }, busy === 'add' ? '校验并保存…' : '添加账号'))),
+            }, busy === 'add' ? '校验并保存…' : '添加账号'),
+            mode === 'password' ? h('button', { className: 'ptap-btn', disabled: busy !== '', onClick: solveCaptcha }, '完成滑块验证') : null)),
 
         h('div', { className: 'ptap-card' },
           h('div', { className: 'ptap-cardhead' },

@@ -272,6 +272,34 @@ function toolsFor(service) {
         return { text: result.text || `(无输出，退出码 ${result.code})`, ...result };
       },
     },
+    {
+      name: 'pta_tasks',
+      description:
+        '领取面板「交给 Agent」提交的 PTA 作业任务（claim=true 标记为 running）。拿到 psid 后按流程做：pta_pull → pta_status / pta_brief → 作答 → 提交；做完用 pta_finish 收尾。',
+      parameters: { claim: { type: 'boolean', description: '是否领取（标记 running），默认 false 只查看' } },
+      output,
+      async execute(args) {
+        const data = await service.tasks({ claim: Boolean(args?.claim) });
+        const lines = data.tasks.map((task) => `${task.id} | PSID ${task.psid} | 账号 ${task.account} | ${task.status}`);
+        return {
+          text: lines.length ? `${lines.join('\n')}\n-- 共 ${lines.length} 个任务；用 pta_pull 开始，pta_finish 收尾 --` : '没有待做任务。',
+          tasks: data.tasks,
+        };
+      },
+    },
+    {
+      name: 'pta_finish',
+      description: '把 pta_tasks 领取的任务标记为完成或失败。',
+      parameters: {
+        id: { type: 'string', required: true, description: '任务 id（pta_tasks 返回）' },
+        status: { type: 'string', description: 'done | failed，默认 done' },
+      },
+      output,
+      async execute(args) {
+        const data = await service.finishTask({ id: args?.id, status: args?.status === 'failed' ? 'failed' : 'done' });
+        return { text: `任务 ${data.task.id} → ${data.task.status}`, ...data };
+      },
+    },
   ];
 }
 
@@ -388,6 +416,8 @@ async function dispatch(service, input) {
       return service.sets({ account: input.account });
     case 'progress':
       return service.progress({ account: input.account });
+    case 'dispatch':
+      return service.dispatch({ psid: input.psid, account: input.account });
     default:
       throw Object.assign(new Error(`不认识的 action：${action}`), { code: 'invalid_input' });
   }

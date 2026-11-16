@@ -191,14 +191,22 @@ window.__ModuleLoader__.load({
                     : h('span', { className: `ptap-chip ${row.daysLeft !== null && row.daysLeft <= 3 ? 'ptap-chip-bad' : ''}` }, `${row.todo}/${row.total}`)),
                 h('td', null, row.daysLeft === null ? '-' : `${row.daysLeft} 天`),
                 h('td', null, dateText(row.endAt)),
-                h('td', null, h('button', {
-                  className: 'ptap-btn',
-                  onClick: () => {
-                    const text = `做 PTA 题集 ${row.id}（${row.name}），按 pta-cli 流程：先 pta_pull，再用 pta_status / pta_brief 读题，答案你来定，提交前把清单给我确认。`;
-                    navigator.clipboard?.writeText(text);
-                    setNotice('任务指令已复制，粘到对话里我就开始做。');
-                  },
-                }, '复制任务'))))));
+                h('td', null, h('div', { style: { display: 'flex', gap: 4 } },
+                  h('button', {
+                    className: 'ptap-btn ptap-btn-primary',
+                    disabled: busy !== '',
+                    onClick: () => run(`dispatch:${row.id}`, async () => {
+                      const result = await call('dispatch', { psid: row.id });
+                      return `已交给 Agent（待做任务 ${result?.pending ?? 1} 个）。回到对话说一句「执行 PTA 任务」即可。`;
+                    }),
+                  }, '交给 Agent'),
+                  h('button', {
+                    className: 'ptap-btn',
+                    onClick: () => {
+                      navigator.clipboard?.writeText(`做 PTA 题集 ${row.id}（${row.name}），按 pta-cli 流程。`);
+                      setNotice('任务指令已复制，粘到对话里我就开始做。');
+                    },
+                  }, '复制任务')))))));
 
       return h('div', { className: 'ptap-wrap' },
         h('div', { className: 'ptap-head' },

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 — 2026-11-16
+
+### 多账号
+- **工作区分区**：拉题结果、源码、todo 一律写到 `<stateDir>/work/<account>/<psid>/`。两个账号挂同一门课的同一个 PSID 时不再互相覆盖；v0.4 及更早的共享目录 `work/<psid>/` 保留为只读兜底（不用重新拉题）。
+- **账号级并发配额**：新增 `perAccountConcurrent`（默认 1，clamp 1~4）。默认同一账号同时只跑一个任务（防风控与状态互踩），调度器按账号 running 数判断，取代原先硬编码的账号锁。
+- **跨账号批量派发**：`dispatch.all` 支持 `{ all: true }`，遍历所有 ready 账号各自入队；登录失效的账号跳过并标注原因。
+- **任务看板按账号计数**：`tasks.board` 新增 `byAccount`（每账号 pending/running/done/failed/cancelled/total），面板 KPI 与账号行可直接读取。
+
+### 契约（只加不改）
+- 新动作参数：`dispatch.all` 的 `all`；新响应字段：`tasks.board.byAccount`、`limits.perAccountConcurrent`。
+- 工具签名不变；`pta_*` 的 `account` 语义与之前一致。
+
+### 测试
+- 冒烟 12 项（新增：工作区按账号分区 + 旧共享目录只读兜底）。
+- 调度 19 项（新增：`perAccountConcurrent=2` 时同账号可并行两个）。
+
 ## 0.4.0 — 2026-11-16
 
 ### 界面

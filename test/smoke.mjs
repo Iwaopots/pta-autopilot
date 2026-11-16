@@ -3,11 +3,12 @@
  * 运行：node test/smoke.mjs
  */
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { apply } from '../index.js';
 import { createAccounts } from '../lib/accounts.js';
+import { createService } from '../lib/service.js';
 
 const results = [];
 const check = async (name, fn) => {
@@ -218,6 +219,32 @@ try {
   await check('未拉题时 pta_brief 报 not_pulled', async () => {
     const tool = sink.tools.find((item) => item.name === 'pta_brief');
     await assert.rejects(() => tool.execute({ psid: '123' }), /还没有拉题/u);
+  });
+
+  await check('工作区按账号分区：同 PSID 两账号互不覆盖，旧共享目录只读兜底', async () => {
+    const sdir = join(dir, 'partition');
+    for (const path of [['a1', '123'], ['b2', '123'], ['456']]) await mkdir(join(sdir, 'work', ...path), { recursive: true });
+    await writeFile(join(sdir, 'accounts.json'), JSON.stringify({
+      version: 1,
+      default: 'a1',
+      accounts: {
+        a1: { id: 'a1', label: 'A', status: 'ready', updatedAt: new Date().toISOString() },
+        b2: { id: 'b2', label: 'B', status: 'ready', updatedAt: new Date().toISOString() },
+      },
+    }), 'utf8');
+    const put = (path, title) => writeFile(path, JSON.stringify({
+      psid: 'x',
+      examId: '1',
+      problems: [{ id: '1', type: 'MULTIPLE_CHOICE', title, content: title, label: '1', score: 1 }],
+    }), 'utf8');
+    await put(join(sdir, 'work', 'a1', '123', 'problems.json'), 'A 的题');
+    await put(join(sdir, 'work', 'b2', '123', 'problems.json'), 'B 的题');
+    await put(join(sdir, 'work', '456', 'problems.json'), '旧共享目录的题');
+
+    const svc = createService({ ctx: makeCtx(credentials, sink), stateDir: sdir });
+    assert.match((await svc.brief({ psid: '123', account: 'a1' })).lines[0], /A 的题/u);
+    assert.match((await svc.brief({ psid: '123', account: 'b2' })).lines[0], /B 的题/u);
+    assert.match((await svc.brief({ psid: '456', account: 'b2' })).lines[0], /旧共享目录的题/u);
   });
 
   console.log(`\n${results.length} checks passed`);

@@ -89,3 +89,11 @@ dsh-pta/
 ├── .github/workflows/  CI（push / PR 跑 gate --offline）
 └── docs/               DETAIL + 本文件
 ```
+
+## 5. 多账号（v0.5.0）
+
+- **身份隔离**：每个账号独立凭据记录（`dsh-pta/account-<uuid>`）、独立工作区 `<stateDir>/work/<account>/<psid>/`。同一 PSID 在不同账号下互不覆盖；v0.4 的共享目录只读兜底。
+- **账号级并发配额**：`perAccountConcurrent`（默认 1）。同一账号同时只跑一个任务，跨账号并行由全局 `maxConcurrent` 控制。配额与互斥分离：配额管并行度，账号锁管互斥。
+- **跨账号派发**：`dispatch.all { all: true }` 遍历 ready 账号各自入队；`auth_required` 账号跳过并记录原因，不阻塞其他账号。
+- **可观测**：`tasks.board.byAccount` 给出每账号各状态计数；`paused` 标出被暂停账号，重登/校验通过后自动 `resume` 并 `pump`。
+- **迁移**：工作区分区不迁移旧文件（只读兜底），tasks.json 结构不变（版本仍为 2），新增字段走 `normalize()` 默认值。

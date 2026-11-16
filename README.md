@@ -8,6 +8,7 @@
 | 面板 | `client.js` + `/dsh-pta/api` | 用户在受保护页面贴 PTASession，直接进凭据服务，不经过模型 |
 | 手 | `lib/pta.js` + `lib/service.js` | 拉题、状态、压缩题面、整卷交客观题、交编程题并轮询判题 |
 | 嘴 | `index.js` 的 `pta_*` 工具 | 模型能调的动作，返回值一律脱敏、只给摘要 |
+| 调度 | `lib/scheduler.js` + `lib/launcher.js` | 任务队列、账号锁、并发、退避重试、崩溃恢复；面板「一键完成」直接开会话投递指令 |
 | 记性 | `skills/pta-cli/SKILL.md` → `~/.dsh/skills/pta-cli/` | 题型规则、确认规则、坑，由 DSH 原生 Skill 发现 |
 
 ## 安全边界
@@ -23,6 +24,7 @@
 
 ```
 accounts.json          账号元数据（id/标签/状态/昵称/时间，0600，无 Cookie）
+tasks.json             任务队列 + 操作日志（version 2）
 work/<PSID>/
   problems.json        全部题面与配置
   problems.md          可读版
@@ -42,13 +44,26 @@ plugin_manager install_bundle target=<本目录绝对路径>
 
 ## 验证
 
-1. 侧栏出现「PTA 作业」，能添加账号并显示「已登录」。
-2. `~/.dsh/skills/pta-cli/SKILL.md` 已同步。
-3. 新会话里问「PTA 有哪些没结束的作业」，模型应调用 `pta_accounts` / `pta_sets`。
+1. `npm test`（或逐个 `node test/*.mjs`）全过；面板渲染测试需 `npm i --no-save react@18 react-dom@18 jsdom@24`，缺依赖会自动跳过。
+2. 重装后 `/_pta/ping`：`tools` 11 个、`toolErrors: []`，`launch.available` 为 `true` 表示「一键完成」可直达模型。
+3. 面板顶部显示「一键直达模型」；点某题集「一键完成」→ 会话列表出现「PTA · 题集名」→ 右侧队列走到「完成」。
+4. `~/.dsh/skills/pta-cli/SKILL.md` 已同步。
+
+## 配置（cordis.patch.yml）
+
+| 键 | 默认 | 说明 |
+| --- | --- | --- |
+| `maxConcurrent` | 2 | 全局同时执行的任务数（同账号始终串行） |
+| `maxAttempts` | 3 | 单任务最多尝试次数（失败指数退避 30s 起，上限 15min） |
+| `autoLaunch` | true | 设为 false 则只排队，不自动开会话 |
+
+## Python 离线兜底
+
+本机 `pta/`、`scripts/pta.ps1` 的 Python 版自 v0.3 起降级为**离线应急**，不再与插件同步数据，也不随本仓库发布；日常一律走插件。
 
 ## 与参考实现的差异
 
-- 参考实现把「手」做成**可编辑 Node CLI + `ctx.shellEnv` 注入 + SessionController 常驻会话 + 工具集收紧**，用于无人值守批量通关；本包只做「工具 + Skill + 凭据隔离」，把调度与自动通关留给用户显式发起。
+- 参考实现把「手」做成**可编辑 Node CLI + `ctx.shellEnv` 注入 + SessionController 常驻会话 + 工具集收紧**；本包沿用它的 SessionController 会话注入写法做「一键完成」，但执行只能由用户在面板显式发起，考试类题集默认拒绝。
 - 账号元数据用 `accounts.json` 而不是 `node:sqlite`（Electron 内置 Node 版本不保证有 `node:sqlite`），写入走临时文件 + rename，0600。
 - 没有引入任何 `@deepseek-ai/*` 依赖，配置 schema 手写 Standard Schema，随 profile 布局都能解析。
 

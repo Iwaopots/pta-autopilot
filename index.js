@@ -12,6 +12,7 @@ import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createLauncher } from './lib/launcher.js';
 import { createService } from './lib/service.js';
 import { redact } from './lib/pta.js';
 
@@ -21,6 +22,9 @@ export const inject = ['webServer', 'tools', 'connection'];
 const PKG_ROOT = dirname(fileURLToPath(import.meta.url));
 const API_PATH = '/dsh-pta/api';
 const MAX_BODY = 512 * 1024;
+/** HTTP 契约版本：只加不改；破坏性改动才升。 */
+export const API_VERSION = 1;
+const PKG_VERSION = '0.3.0';
 
 const ERRORS = {
   invalid_input: [400, '请求参数无效。'],
@@ -37,6 +41,11 @@ const ERRORS = {
   platform_error: [502, 'PTA 返回异常，操作未确认。'],
   cli_failed: [502, 'PTA CLI 执行失败。'],
   unavailable: [503, '网络暂时不可用。'],
+  exam_guard: [409, '限时考试/监考类题目集默认不自动做。'],
+  launch_unavailable: [409, '当前 DSH 不支持插件直接开会话。'],
+  busy: [409, '任务现在不能启动。'],
+  invalid_state: [409, '任务状态不允许这个操作。'],
+  state_version: [409, '本地状态文件版本过高，已拒绝写入，请升级插件。'],
 };
 
 function json(res, status, body) {
@@ -77,6 +86,10 @@ export const Config = {
       if (typeof value.stateDir === 'string' && value.stateDir !== '') out.stateDir = value.stateDir;
       if (typeof value.syncSkill === 'boolean') out.syncSkill = value.syncSkill;
       if (typeof value.skillDir === 'string' && value.skillDir !== '') out.skillDir = value.skillDir;
+      for (const key of ['maxConcurrent', 'maxAttempts']) {
+        if (Number.isInteger(value[key]) && value[key] > 0) out[key] = value[key];
+      }
+      if (typeof value.autoLaunch === 'boolean') out.autoLaunch = value.autoLaunch;
       return { value: out };
     },
   },
@@ -275,29 +288,52 @@ function toolsFor(service) {
     {
       name: 'pta_tasks',
       description:
-        '领取面板「交给 Agent」提交的 PTA 作业任务（claim=true 标记为 running）。拿到 psid 后按流程做：pta_pull → pta_status / pta_brief → 作答 → 提交；做完用 pta_finish 收尾。',
-      parameters: { claim: { type: 'boolean', description: '是否领取（标记 running），默认 false 只查看' } },
+        '查看或领取面板派发的 PTA 作业任务。claim=true 领取一个（遵守账号锁：同账号同时只跑一个；全局并发上限；临期优先），可用 id 指定。' +
+        '拿到任务后按 pta-cli 流程做：pta_pull → pta_status / pta_brief → 作答提交；过程中用 pta_progress 回写进度，结束用 pta_finish 收尾。',
+      parameters: {
+        claim: { type: 'boolean', description: '是否领取（标记 running），默认 false 只查看' },
+        id: { type: 'string', description: '只领取这个任务 id（可选）' },
+        account: { type: 'string', description: '只领取这个账号的任务（可选）' },
+      },
       output,
       async execute(args) {
-        const data = await service.tasks({ claim: Boolean(args?.claim) });
-        const lines = data.tasks.map((task) => `${task.id} | PSID ${task.psid} | 账号 ${task.account} | ${task.status}`);
+        const data = await service.tasks({ claim: Boolean(args?.claim), id: args?.id, account: args?.account });
+        const lines = data.tasks.map((task) => `${task.id} | PSID ${task.psid}${task.setName ? ` ${task.setName}` : ''} | 账号 ${task.account} | ${task.status} | 第 ${task.attempts}/${task.maxAttempts} 次`);
+        const empty = data.reason === 'concurrency' ? '并发已满，稍后再领。' : '没有可领取的任务。';
         return {
-          text: lines.length ? `${lines.join('\n')}\n-- 共 ${lines.length} 个任务；用 pta_pull 开始，pta_finish 收尾 --` : '没有待做任务。',
+          text: lines.length ? `${lines.join('\n')}\n-- 共 ${lines.length} 个；做题中用 pta_progress 回写，结束用 pta_finish --` : empty,
           tasks: data.tasks,
         };
       },
     },
     {
-      name: 'pta_finish',
-      description: '把 pta_tasks 领取的任务标记为完成或失败。',
+      name: 'pta_progress',
+      description: '回写任务进度（也是心跳：超过 20 分钟没有心跳的任务会被判定中断并重排）。每完成一个题型或一道编程题调用一次。',
       parameters: {
-        id: { type: 'string', required: true, description: '任务 id（pta_tasks 返回）' },
-        status: { type: 'string', description: 'done | failed，默认 done' },
+        id: { type: 'string', required: true, description: '任务 id' },
+        done: { type: 'number', description: '已完成题数' },
+        total: { type: 'number', description: 'todo 总题数' },
+        note: { type: 'string', description: '一句话进度，例如「单选 10 题已交」' },
       },
       output,
       async execute(args) {
-        const data = await service.finishTask({ id: args?.id, status: args?.status === 'failed' ? 'failed' : 'done' });
-        return { text: `任务 ${data.task.id} → ${data.task.status}`, ...data };
+        const { task } = await service.taskProgress({ id: args?.id, done: args?.done, total: args?.total, note: args?.note });
+        return { text: `任务 ${task.id}：${task.progress.done}/${task.progress.total} ${task.progress.note}`, task };
+      },
+    },
+    {
+      name: 'pta_finish',
+      description: '把任务标记为完成（done）或失败（failed）。failed 且未用尽 3 次会自动指数退避后重试；收尾前先用 pta_status 复核。',
+      parameters: {
+        id: { type: 'string', required: true, description: '任务 id（pta_tasks 返回）' },
+        status: { type: 'string', description: 'done | failed，默认 done' },
+        error: { type: 'string', description: 'failed 时写明原因' },
+      },
+      output,
+      async execute(args) {
+        const data = await service.finishTask({ id: args?.id, status: args?.status === 'failed' ? 'failed' : 'done', error: args?.error });
+        const tail = data.task.status === 'pending' ? `（将于 ${String(data.task.nextRunAt).slice(11, 19)} 自动重试）` : '';
+        return { text: `任务 ${data.task.id} → ${data.task.status}${tail}`, ...data };
       },
     },
   ];
@@ -309,7 +345,11 @@ export function apply(ctx, config = {}) {
   const log = ctx.logger;
 
   ctx.effect(() => {
-    const service = createService({ ctx, stateDir, log });
+    const launcher = config.autoLaunch === false ? undefined : createLauncher(ctx, { cwd: join(stateDir, 'work'), log });
+    const service = createService({
+      ctx, stateDir, log, launcher,
+      scheduler: { maxConcurrent: config.maxConcurrent ?? 2, maxAttempts: config.maxAttempts ?? 3 },
+    });
     const disposers = [];
     const registered = [];
     const toolErrors = [];
@@ -320,8 +360,10 @@ export function apply(ctx, config = {}) {
       path: '/_pta/ping',
       handler: async (req, res) => {
         json(res, 200, {
-          ok: true, plugin: 'dsh-pta', pid: process.pid,
-          stateDir, tools: registered, toolErrors, at: new Date().toISOString(),
+          ok: true, plugin: 'dsh-pta', version: PKG_VERSION, apiVersion: API_VERSION, pid: process.pid,
+          stateDir, tools: registered, toolErrors,
+          launch: launcher?.capability() ?? { available: false, mode: 'disabled' },
+          at: new Date().toISOString(),
         });
       },
     }));
@@ -343,7 +385,7 @@ export function apply(ctx, config = {}) {
           try {
             input = await readBody(req);
             const data = await dispatch(service, input);
-            json(res, 200, { ok: true, data });
+            json(res, 200, { ok: true, apiVersion: API_VERSION, data });
           } catch (error) {
             const code = typeof error?.code === 'string' && ERRORS[error.code] ? error.code : 'agent_failed';
             const [status, message] = ERRORS[code] ?? [500, '操作未完成。'];
@@ -374,7 +416,10 @@ export function apply(ctx, config = {}) {
       }
     }
 
-    // 3) 原生 Skill：同步到 ~/.dsh/skills/pta-cli/SKILL.md
+    // 3) 调度节拍：崩溃恢复 + 自动开会话（宿主不支持时 pump 直接返回）
+    service.startTicker();
+
+    // 4) 原生 Skill：同步到 ~/.dsh/skills/pta-cli/SKILL.md
     if (config.syncSkill !== false) {
       void syncSkill(skillDir).then((result) => {
         if (result.changed) log?.info?.(`[dsh-pta] 已同步 Skill 到 ${result.path}`);
@@ -417,7 +462,24 @@ async function dispatch(service, input) {
     case 'progress':
       return service.progress({ account: input.account });
     case 'dispatch':
-      return service.dispatch({ psid: input.psid, account: input.account });
+      return service.dispatch({
+        psid: input.psid, account: input.account, priority: input.priority, allowExam: input.allowExam === true,
+        autoStart: input.autoStart !== false, setName: input.setName, endAt: input.endAt, exam: input.exam === true,
+      });
+    case 'dispatch.all':
+      return service.dispatchAll({ account: input.account });
+    case 'tasks.board':
+      return service.taskBoard();
+    case 'tasks.start':
+      return service.startTask({ id: input.id });
+    case 'tasks.cancel':
+      return service.cancelTask({ id: input.id });
+    case 'tasks.retry':
+      return service.retryTask({ id: input.id });
+    case 'tasks.bump':
+      return service.bumpTask({ id: input.id });
+    case 'tasks.clear':
+      return service.clearTasks();
     default:
       throw Object.assign(new Error(`不认识的 action：${action}`), { code: 'invalid_input' });
   }

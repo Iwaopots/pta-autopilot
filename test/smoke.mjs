@@ -76,9 +76,9 @@ const sink = { tools: [], routes: [] };
 try {
   apply(makeCtx(credentials, sink), { stateDir, skillDir, syncSkill: true });
 
-  await check('注册 10 个 pta_* 工具', () => {
+  await check('注册 11 个 pta_* 工具', () => {
     const names = sink.tools.map((tool) => tool.name).sort();
-    assert.deepEqual(names, ['pta_accounts', 'pta_brief', 'pta_cli', 'pta_finish', 'pta_pull', 'pta_sets', 'pta_status', 'pta_submit_obj', 'pta_submit_prog', 'pta_tasks']);
+    assert.deepEqual(names, ['pta_accounts', 'pta_brief', 'pta_cli', 'pta_finish', 'pta_progress', 'pta_pull', 'pta_sets', 'pta_status', 'pta_submit_obj', 'pta_submit_prog', 'pta_tasks']);
     for (const tool of sink.tools) {
       assert.equal(typeof tool.parameters, 'object');
       assert.ok(tool.description.length > 20);
@@ -86,11 +86,28 @@ try {
     }
   });
 
-  await check('注册 API 与诊断路由', () => {
+  await check('注册 API 与诊断路由，ping 无工具错误', async () => {
     const api = sink.routes.find((route) => route.path === '/dsh-pta/api');
     assert.ok(api, '缺少 /dsh-pta/api 路由');
     assert.equal(api.kind, 'exact');
-    assert.ok(sink.routes.some((route) => route.path === '/_pta/ping'));
+    const ping = sink.routes.find((route) => route.path === '/_pta/ping');
+    assert.ok(ping);
+    const res = makeRes();
+    await ping.handler({ method: 'GET' }, res);
+    const body = JSON.parse(res.body);
+    assert.equal(body.tools.length, 11);
+    assert.deepEqual(body.toolErrors, []);
+    assert.equal(body.apiVersion, 1);
+    assert.equal(body.launch.available, false, '假宿主没有 sessionController，应降级而不是报错');
+  });
+
+  await check('API 队列视图 tasks.board 可用且带 apiVersion', async () => {
+    const res = makeRes();
+    await sink.routes.find((route) => route.path === '/dsh-pta/api').handler(makeReq({ action: 'tasks.board' }), res);
+    const body = JSON.parse(res.body);
+    assert.equal(body.ok, true, res.body);
+    assert.equal(body.apiVersion, 1);
+    assert.deepEqual(Object.keys(body.data.counts).sort(), ['cancelled', 'done', 'failed', 'pending', 'running']);
   });
 
   await check('Skill 同步到 skills/pta-cli/SKILL.md', async () => {

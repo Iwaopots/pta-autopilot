@@ -6,7 +6,7 @@
  *   node scripts/gate.mjs --offline  # 不连本机 DSH（CI / 沙箱用）
  *   node scripts/gate.mjs --syntax-only  # 只做语法检查（npm run check）
  *
- * 环境变量：PTA_PING_URL（默认 http://127.0.0.1:49531/_pta/ping）、PTA_ALLOW_SKIP=1（允许测试 skip，仅本地临时用）。
+ * 环境变量：PTA_PING_URL（默认取 DSH_WEB_URL，再退到 http://127.0.0.1:49531/_pta/ping）、PTA_ALLOW_SKIP=1（允许测试 skip，仅本地临时用）。
  * 任一项失败退出码 1，最后一行 ALL GREEN 才算过。
  */
 import { spawnSync } from 'node:child_process';
@@ -66,7 +66,8 @@ if (offline) {
   console.log('== 4. 插件在线 == （--offline，跳过）');
 } else {
   console.log('== 4. 插件在线 ==');
-  const url = process.env.PTA_PING_URL ?? 'http://127.0.0.1:49531/_pta/ping';
+  const defaultPing = `${(process.env.DSH_WEB_URL ?? 'http://127.0.0.1:49531').replace(/\/+$/u, '')}/_pta/ping`;
+  const url = process.env.PTA_PING_URL ?? defaultPing;
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     const ping = await response.json();

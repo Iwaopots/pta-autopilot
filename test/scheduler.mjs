@@ -63,6 +63,17 @@ try {
     assert.equal(third.task, null, '账号 a 正忙，剩下的 a 任务不能领');
   });
 
+  await check('账号级并发配额：perAccountConcurrent=2 允许同账号并行两个', async () => {
+    const s = createScheduler({ stateDir: await fresh(), maxConcurrent: 4, perAccountConcurrent: 2 });
+    await s.enqueue({ psid: '1', account: 'a' });
+    await s.enqueue({ psid: '2', account: 'a' });
+    await s.enqueue({ psid: '3', account: 'a' });
+    assert.ok((await s.claim()).task);
+    assert.ok((await s.claim()).task);
+    assert.equal((await s.claim()).task, null, '配额 2 已满，第三个不能领');
+    assert.equal(s.limits.perAccountConcurrent, 2);
+  });
+
   await check('全局并发上限', async () => {
     const s = createScheduler({ stateDir: await fresh(), maxConcurrent: 2 });
     for (const account of ['a', 'b', 'c']) await s.enqueue({ psid: '1', account });

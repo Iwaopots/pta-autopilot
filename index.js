@@ -476,7 +476,7 @@ async function dispatch(service, input) {
         autoStart: input.autoStart !== false, setName: input.setName, endAt: input.endAt, exam: input.exam === true,
       });
     case 'dispatch.all':
-      return service.dispatchAll({ account: input.account });
+      return service.dispatchAll({ account: input.account, all: input.all === true });
     case 'tasks.board':
       return service.taskBoard();
     case 'tasks.start':

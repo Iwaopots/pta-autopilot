@@ -1,4 +1,4 @@
-# dsh-pta —— PTA（pintia.cn）作业工具包
+# DSH 适配版 —— PTA（pintia.cn）作业工具包
 
 给 DeepSeek Harness 用的 PTA 工具包，架构照 [dsh-toolkit-educoder](https://github.com/blueforst/dsh-toolkit-educoder) 的分层：
 

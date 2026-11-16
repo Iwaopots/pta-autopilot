@@ -115,7 +115,7 @@ try {
     for (let attempt = 0; attempt < 40; attempt += 1) {
       try {
         const text = await readFile(target, 'utf8');
-        assert.match(text, /^---\nname: pta-cli/mu);
+        assert.match(text, /^---\r?\nname: pta-cli/mu);
         assert.match(text, /pta_submit_prog/u);
         return;
       } catch (error) {

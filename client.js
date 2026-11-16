@@ -119,6 +119,7 @@ window.__ModuleLoader__.load({
       }, []);
 
       useEffect(() => { void refresh(); }, [refresh]);
+      useEffect(() => { if (info?.defaultAccount) void loadSets(null); }, [info?.defaultAccount]);
 
       const run = async (key, task) => {
         setBusy(key);
@@ -181,7 +182,7 @@ window.__ModuleLoader__.load({
           : h('table', { className: 'ptap-table' },
               h('thead', null, h('tr', null,
                 h('th', null, 'PSID'), h('th', null, '名称'), h('th', null, '未完成'),
-                h('th', null, '剩余'), h('th', null, '截止'))),
+                h('th', null, '剩余'), h('th', null, '截止'), h('th', null, '操作'))),
               h('tbody', null, sets.map((row) => h('tr', { key: row.id },
                 h('td', null, row.id),
                 h('td', null, row.name),
@@ -189,7 +190,15 @@ window.__ModuleLoader__.load({
                   : row.todo === 0 ? h('span', { className: 'ptap-chip ptap-chip-ok' }, '已完成')
                     : h('span', { className: `ptap-chip ${row.daysLeft !== null && row.daysLeft <= 3 ? 'ptap-chip-bad' : ''}` }, `${row.todo}/${row.total}`)),
                 h('td', null, row.daysLeft === null ? '-' : `${row.daysLeft} 天`),
-                h('td', null, dateText(row.endAt))))));
+                h('td', null, dateText(row.endAt)),
+                h('td', null, h('button', {
+                  className: 'ptap-btn',
+                  onClick: () => {
+                    const text = `做 PTA 题集 ${row.id}（${row.name}），按 pta-cli 流程：先 pta_pull，再用 pta_status / pta_brief 读题，答案你来定，提交前把清单给我确认。`;
+                    navigator.clipboard?.writeText(text);
+                    setNotice('任务指令已复制，粘到对话里我就开始做。');
+                  },
+                }, '复制任务'))))));
 
       return h('div', { className: 'ptap-wrap' },
         h('div', { className: 'ptap-head' },

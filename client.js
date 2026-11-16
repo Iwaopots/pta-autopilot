@@ -133,7 +133,7 @@ window.__ModuleLoader__.load({
         setBusy(`sets:${account || 'default'}`);
         setError('');
         try {
-          const result = await call('sets', account ? { account } : {});
+          const result = await call('progress', account ? { account } : {});
           setSets(result?.sets ?? []);
         } catch (cause) {
           setSets([]);
@@ -145,15 +145,21 @@ window.__ModuleLoader__.load({
 
       const accounts = info?.accounts ?? [];
       const setsTable = !sets
-        ? h('div', { className: 'ptap-hint' }, '点「刷新」看默认账号未结束的题目集。')
+        ? h('div', { className: 'ptap-hint' }, '点「刷新」看默认账号各题目集的完成度。')
         : sets.length === 0
           ? h('div', { className: 'ptap-empty' }, '没有未结束的题目集。')
           : h('table', { className: 'ptap-table' },
-              h('thead', null, h('tr', null, h('th', null, 'PSID'), h('th', null, '名称'), h('th', null, '截止'))),
+              h('thead', null, h('tr', null,
+                h('th', null, 'PSID'), h('th', null, '名称'), h('th', null, '未完成'),
+                h('th', null, '剩余'), h('th', null, '截止'))),
               h('tbody', null, sets.map((row) => h('tr', { key: row.id },
                 h('td', null, row.id),
                 h('td', null, row.name),
-                h('td', null, dateText(row.endAtText || row.endAt))))));
+                h('td', null, row.total < 0 ? '—'
+                  : row.todo === 0 ? h('span', { className: 'ptap-chip ptap-chip-ok' }, '已完成')
+                    : h('span', { className: `ptap-chip ${row.daysLeft !== null && row.daysLeft <= 3 ? 'ptap-chip-bad' : ''}` }, `${row.todo}/${row.total}`)),
+                h('td', null, row.daysLeft === null ? '-' : `${row.daysLeft} 天`),
+                h('td', null, dateText(row.endAt))))));
 
       return h('div', { className: 'ptap-wrap' },
         h('div', { className: 'ptap-head' },

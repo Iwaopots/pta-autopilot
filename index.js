@@ -386,6 +386,8 @@ async function dispatch(service, input) {
       return service.setDefaultAccount({ id: input.id });
     case 'sets':
       return service.sets({ account: input.account });
+    case 'progress':
+      return service.progress({ account: input.account });
     default:
       throw Object.assign(new Error(`不认识的 action：${action}`), { code: 'invalid_input' });
   }

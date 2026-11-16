@@ -1,6 +1,6 @@
 {
   "name": "dsh-pta",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "DSH 适配版 · PTA（pintia.cn）作业工具包：面板一键派发直达模型、多账号并发调度、凭据隔离、原生 Skill。",
   "type": "module",
   "main": "./index.js",

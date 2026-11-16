@@ -1,4 +1,4 @@
-﻿{
+{
     "name":  "dsh-pta",
     "version":  "0.2.0",
     "description":  "PTA（pintia.cn）作业工具包：按账号隔离的凭据保险箱、题目集与编程题工具、原生 Skill 工作流。",

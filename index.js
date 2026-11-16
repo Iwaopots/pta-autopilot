@@ -375,7 +375,9 @@ async function dispatch(service, input) {
     case 'accounts.list':
       return service.listAccounts();
     case 'accounts.add':
-      return service.addAccount({ label: input.label, cookie: input.cookie, login: input.login, password: input.password });
+      return service.addAccount({ label: input.label, cookie: input.cookie, login: input.login, password: input.password, ticket: input.ticket, randStr: input.randStr });
+    case 'accounts.relogin':
+      return service.relogin({ id: input.id, password: input.password, ticket: input.ticket, randStr: input.randStr });
     case 'accounts.check':
       return service.checkAccount({ id: input.id });
     case 'accounts.remove':

@@ -35,6 +35,7 @@ const ERRORS = {
   not_started: [409, '题目集未开始、已结束或没有权限。'],
   rate_limited: [429, 'PTA 限流，稍后再试。'],
   platform_error: [502, 'PTA 返回异常，操作未确认。'],
+  cli_failed: [502, 'PTA CLI 执行失败。'],
   unavailable: [503, '网络暂时不可用。'],
 };
 
@@ -254,6 +255,21 @@ function toolsFor(service) {
           text: `题目 ${data.pid} → ${data.status}，得分 ${data.score}（submission ${data.submissionId}，源码 ${data.file}）${fails}`,
           ...data,
         };
+      },
+    },
+    {
+      name: 'pta_cli',
+      description:
+        '直接跑随包携带的 PTA CLI（融合自 @iwaopots/dsh-toolkit-pta）。覆盖 pta_* 工具做不到的场景：' +
+        '账号密码/验证码登录、批量 `run` 自动解题（DeepSeek 作答，需 DEEPSEEK_API_KEY）、`serve` 实时看板、`doctor` 自检、`dashboard` 静态看板。' +
+        'args 是参数数组，例如 ["doctor"]、["problem-sets"]、["run","--problem-set","123","--mode","todo","--pace","normal","--yes"]。',
+      parameters: {
+        args: { type: 'array', items: { type: 'string' }, required: true, description: 'CLI 参数数组，例如 ["doctor"]' },
+      },
+      output,
+      async execute(args) {
+        const result = await service.cli(args?.args);
+        return { text: result.text || `(无输出，退出码 ${result.code})`, ...result };
       },
     },
   ];

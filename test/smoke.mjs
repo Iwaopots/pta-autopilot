@@ -76,9 +76,9 @@ const sink = { tools: [], routes: [] };
 try {
   apply(makeCtx(credentials, sink), { stateDir, skillDir, syncSkill: true });
 
-  await check('注册 7 个 pta_* 工具', () => {
+  await check('注册 8 个 pta_* 工具', () => {
     const names = sink.tools.map((tool) => tool.name).sort();
-    assert.deepEqual(names, ['pta_accounts', 'pta_brief', 'pta_pull', 'pta_sets', 'pta_status', 'pta_submit_obj', 'pta_submit_prog']);
+    assert.deepEqual(names, ['pta_accounts', 'pta_brief', 'pta_cli', 'pta_pull', 'pta_sets', 'pta_status', 'pta_submit_obj', 'pta_submit_prog']);
     for (const tool of sink.tools) {
       assert.equal(typeof tool.parameters, 'object');
       assert.ok(tool.description.length > 20);

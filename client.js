@@ -319,7 +319,15 @@ window.__ModuleLoader__.load({
       });
 
       const dispatchAll = () => run('dispatchAll', async () => {
-        const result = await call('dispatch.all', viewAccount ? { account: viewAccount } : {});
+        // 多账号时「全部完成」按账号遍历派发；单账号只派当前账号
+        const result = accounts.length > 1
+          ? await call('dispatch.all', { all: true })
+          : await call('dispatch.all', viewAccount ? { account: viewAccount } : {});
+        if (result.all) {
+          const queued = (result.results ?? []).reduce((sum, row) => sum + (row.queued?.length ?? 0), 0);
+          const paused = (result.results ?? []).filter((row) => row.error || (row.skipped ?? []).some((item) => item.reason === 'auth_required'));
+          return `已为 ${result.results?.length ?? 0} 个账号派发 ${queued} 个题集${paused.length ? `，${paused.length} 个账号跳过（登录失效/异常）` : ''}。`;
+        }
         const skipped = result.skipped?.length ? `，跳过 ${result.skipped.length} 个考试类` : '';
         return `已派发 ${result.queued?.length ?? 0} 个题集${skipped}。`;
       });
@@ -357,13 +365,25 @@ window.__ModuleLoader__.load({
         h('button', { key: 'rm', className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => { if (window.confirm(`删除账号「${account.label}」及其凭据？\n队列里这个账号的任务不会自动删除。`)) void run(`remove:${account.id}`, async () => { await call('accounts.remove', { id: account.id }); return '已删除（凭据一并删除）'; }); } }, '删除'),
       ];
       const statusChip = (account) => h(Chip, { kind: account.status === 'ready' ? 'ok' : 'bad' }, STATUS_TEXT[account.status] ?? account.status);
+      // 每账号队列概况：跑 / 待 / 败（来自 tasks.board.byAccount）
+      const queueBadge = (id) => {
+        const row = board?.byAccount?.[id];
+        if (!row) return '';
+        const parts = [];
+        if (row.running) parts.push(`跑 ${row.running}`);
+        if (row.pending) parts.push(`待 ${row.pending}`);
+        if (row.failed) parts.push(`败 ${row.failed}`);
+        return parts.join(' / ');
+      };
 
       const accountRows = accounts.length === 0
         ? h('div', { className: 'ptap-empty' }, '还没有账号。', h('br'), '点「添加」用账号密码登录，或粘贴 PTASession。')
         : accounts.map((account) => h('div', { className: 'ptap-row', key: account.id },
           h('div', { className: 'ptap-grow' },
             h('div', { className: 'ptap-name', title: account.label }, account.label, account.id === defaultAccount ? h('span', { className: 'ptap-count' }, ' · 默认') : null),
-            h('div', { className: 'ptap-mono', title: account.id }, `${account.nickname || '未校验'} · ${account.id.slice(0, 8)}`),
+            h('div', { className: 'ptap-mono', title: account.id },
+              `${account.nickname || '未校验'} · ${account.id.slice(0, 8)}`,
+              queueBadge(account.id) ? h('span', { className: 'ptap-count' }, ` · ${queueBadge(account.id)}`) : null),
             h('div', { className: 'ptap-actions', style: { marginTop: 4 } }, accountActions(account))),
           statusChip(account)));
       const reloginBox = relogin ? h('div', { className: 'ptap-cardbody ptap-collapse' },

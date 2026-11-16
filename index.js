@@ -94,7 +94,7 @@ export const Config = {
       if (typeof value.stateDir === 'string' && value.stateDir !== '') out.stateDir = value.stateDir;
       if (typeof value.syncSkill === 'boolean') out.syncSkill = value.syncSkill;
       if (typeof value.skillDir === 'string' && value.skillDir !== '') out.skillDir = value.skillDir;
-      for (const key of ['maxConcurrent', 'maxAttempts']) {
+      for (const key of ['maxConcurrent', 'maxAttempts', 'perAccountConcurrent']) {
         if (Number.isInteger(value[key]) && value[key] > 0) out[key] = value[key];
       }
       if (typeof value.autoLaunch === 'boolean') out.autoLaunch = value.autoLaunch;
@@ -357,7 +357,7 @@ export function apply(ctx, config = {}) {
     const launcher = config.autoLaunch === false ? undefined : createLauncher(ctx, { cwd: join(stateDir, 'work'), log });
     const service = createService({
       ctx, stateDir, log, launcher,
-      scheduler: { maxConcurrent: config.maxConcurrent ?? 2, maxAttempts: config.maxAttempts ?? 3 },
+      scheduler: { maxConcurrent: config.maxConcurrent ?? 2, maxAttempts: config.maxAttempts ?? 3, perAccountConcurrent: config.perAccountConcurrent ?? 1 },
     });
     const disposers = [];
     const registered = [];

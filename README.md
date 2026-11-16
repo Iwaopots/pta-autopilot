@@ -16,7 +16,7 @@
 - **Cookie 不进对话、不进日志、不落明文磁盘**：`PTASession` 只写进 DSH 凭据服务；工具与 API 的返回、`redact()` 出口都不含它。
 - **按账号隔离**：一个账号一条凭据记录 + 一条元数据；删账号连凭据一起删。
 - **面板同源 + 已登录校验**：`ctx.connection.requestRejection(req)` 不通过直接 401/403。
-- **题目与答案落盘**：`<stateDir>/work/<PSID>/problems.json|md`、`todo.json`、`sol/`，模型只读需要的那一段。
+- **题目与答案落盘**：`<stateDir>/work/<账号>/<PSID>/problems.json|md`、`todo.json`、`sol/`，模型只读需要的那一段。
 
 ## 状态目录
 
@@ -25,7 +25,7 @@
 ```
 accounts.json          账号元数据（id/标签/状态/昵称/时间，0600，无 Cookie）
 tasks.json             任务队列 + 操作日志（version 2）
-work/<PSID>/
+work/<账号>/<PSID>/
   problems.json        全部题面与配置
   problems.md          可读版
   todo.json            未完成/未 AC 的题目 id

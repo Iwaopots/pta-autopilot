@@ -24,7 +24,7 @@
 
 ## 数据放在哪
 
-`~/.dsh/storages/pta/`：`accounts.json` 只存账号元数据（0600，无 Cookie）；`tasks.json` 是任务队列和操作日志；`work/<PSID>/` 存题面、待办和提交过的源码。凭据本体在 DSH 凭据服务里。
+`~/.dsh/storages/pta/`：`accounts.json` 只存账号元数据（0600，无 Cookie）；`tasks.json` 是任务队列和操作日志；`work/<账号>/<PSID>/` 存题面、待办和提交过的源码。凭据本体在 DSH 凭据服务里。
 
 ## 边界
 

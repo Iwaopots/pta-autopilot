@@ -14,7 +14,9 @@
         # 每次加载都把随包的 SKILL.md 同步过去，保证指令不过期
         syncSkill: true
         # 全局并发任务数（同账号始终串行）
-        maxConcurrent: 2
+        maxConcurrent: 2
+        # 同一账号允许的并发任务数（默认 1：同账号串行，防风控与状态互踩）
+        perAccountConcurrent: 1
         # 单任务最多尝试次数（失败指数退避）
         maxAttempts: 3
         # false = 只排队，不自动开会话

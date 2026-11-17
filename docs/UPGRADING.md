@@ -8,7 +8,7 @@
 git pull
 npm install            # 只装测试用 devDependencies
 npm run gate:offline   # 先确认仓库本身是绿的
-plugin_manager remove_bundle dsh-pta
+plugin_manager remove_bundle pta-autopilot
 plugin_manager install_bundle <本目录绝对路径>
 npm run gate           # 带本机 ping：确认装上的版本号和仓库一致
 ```

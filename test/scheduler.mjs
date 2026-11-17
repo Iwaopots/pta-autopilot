@@ -19,7 +19,7 @@ const check = async (name, fn) => {
   console.log(`ok - ${name}`);
 };
 
-const root = await mkdtemp(join(tmpdir(), 'dsh-pta-sched-'));
+const root = await mkdtemp(join(tmpdir(), 'pta-autopilot-sched-'));
 let n = 0;
 const fresh = async () => join(root, `s${n += 1}`);
 const DAY = 86_400_000;
@@ -201,7 +201,7 @@ try {
     const board = await service.taskBoard();
     assert.equal(board.counts.done, 1, JSON.stringify(board.counts));
     assert.equal(followups.length, 1, '模型应收到且只收到一条指令');
-    assert.equal(followups[0].source.kind, 'dsh-pta');
+    assert.equal(followups[0].source.kind, 'pta-autopilot');
     const [task] = board.tasks;
     assert.equal(task.progress.done, 4, 'done 时进度补满');
     assert.ok(task.sessionId, '应记录会话 id');

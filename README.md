@@ -1,11 +1,15 @@
-# DSH 适配版 —— PTA（pintia.cn）作业工具包
+# pta-autopilot —— PTA 作业自动驾驶（DSH 插件）
 
-给 DeepSeek Harness 用的 PTA 工具包，架构照 [dsh-toolkit-educoder](https://github.com/blueforst/dsh-toolkit-educoder) 的分层：
+给 DeepSeek Harness 用的 PTA（pintia.cn）作业自动化插件：**面板下指令，Agent 自动驾驶**——拉题、读题、写代码、交作业、看判题全流程，凭据按账号隔离。
+
+> 0.6.0 起由 `dsh-pta` 改名而来；旧凭据键 `dsh-pta/account-*` 会自动迁移，已绑账号不用重新登录。
+
+架构照 [dsh-toolkit-educoder](https://github.com/blueforst/dsh-toolkit-educoder) 的分层：
 
 | 层 | 本仓库 | 职责 |
 | --- | --- | --- |
-| 凭据隔离 | `ctx.credentials` + `lib/accounts.js` | 每个账号一条 `grant` 记录（键 `dsh-pta/account-<uuid>`），Cookie 只在 Host 进程内流动 |
-| 面板 | `client.js` + `/dsh-pta/api` | 用户在受保护页面贴 PTASession，直接进凭据服务，不经过模型 |
+| 凭据隔离 | `ctx.credentials` + `lib/accounts.js` | 每个账号一条 `grant` 记录（键 `pta-autopilot/account-<uuid>`），Cookie 只在 Host 进程内流动 |
+| 面板 | `client.js` + `/pta-autopilot/api` | 用户在受保护页面贴 PTASession，直接进凭据服务，不经过模型 |
 | 手 | `lib/pta.js` + `lib/service.js` | 拉题、状态、压缩题面、整卷交客观题、交编程题并轮询判题 |
 | 嘴 | `index.js` 的 `pta_*` 工具 | 模型能调的动作，返回值一律脱敏、只给摘要 |
 | 调度 | `lib/scheduler.js` + `lib/launcher.js` | 任务队列、账号锁、并发、退避重试、崩溃恢复；面板「一键完成」直接开会话投递指令 |

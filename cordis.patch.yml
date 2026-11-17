@@ -1,11 +1,11 @@
-# dsh-pta bundle patch —— 把 PTA 工具包插进 profile 的组合。
+# pta-autopilot bundle patch —— 把 PTA 工具包插进 profile 的组合。
 #
 # 这一行同时挂两半：
-#   · exports "."        → Host 进程：注册 /dsh-pta/api、pta_* 工具、同步 Skill
+#   · exports "."        → Host 进程：注册 /pta-autopilot/api、pta_* 工具、同步 Skill
 #   · exports "./client" → Web 面板：「PTA 作业」侧栏 + 主区页面（由 package.json 的 dsh.client 声明）
 - insert:
-    - id: dsh-pta
-      name: dsh-pta
+    - id: pta-autopilot
+      name: pta-autopilot
       config:
         # 留空 = ~/.dsh/storages/pta（题目缓存、accounts.json 元数据）
         stateDir: ''
@@ -14,7 +14,8 @@
         # 每次加载都把随包的 SKILL.md 同步过去，保证指令不过期
         syncSkill: true
         # 全局并发任务数（同账号始终串行）
-        maxConcurrent: 2
+        maxConcurrent: 2
+
         # 同一账号允许的并发任务数（默认 1：同账号串行，防风控与状态互踩）
         perAccountConcurrent: 1
         # 单任务最多尝试次数（失败指数退避）

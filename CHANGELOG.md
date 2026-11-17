@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-11-17
+
+### 改名
+- 项目从 `dsh-pta` 改名为 **`pta-autopilot`**（PTA 作业自动驾驶）：包名、插件 id、客户端 loader id、面板 id、HTTP 路由（`/pta-autopilot/api`）、Skill 文案、文档与测试断言统一。
+- **旧凭据自动迁移**：凭据键从 `dsh-pta/account-<uuid>` 改为 `pta-autopilot/account-<uuid>`；读到旧键时自动复制到新键并删除旧键，已绑定账号无需重新登录。删账号会同时清掉新旧两个键。
+- 状态目录保持 `~/.dsh/storages/pta/` 不变（账号元数据、任务队列、题目缓存都不用搬）。
+- Skill 仍是 `pta-cli`，`pta_*` 工具名与参数不变；面板与 API 契约不变。
+
 ## 0.5.0 — 2026-11-16
 
 ### 多账号

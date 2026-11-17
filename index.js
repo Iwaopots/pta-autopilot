@@ -1,12 +1,12 @@
 /**
- * dsh-pta —— PTA（pintia.cn）作业工具包（Host 半边）。
+ * pta-autopilot —— PTA（pintia.cn）作业工具包（Host 半边）。
  *
  * 设计照 dsh-toolkit-educoder 的分层：
  *   · 凭据隔离：PTASession 只存在 DSH 凭据服务里（ctx.credentials），按账号一条记录；
  *     模型只看到 id/标签/昵称，Cookie 不进提示词、不进日志、不落明文。
  *   · 下指令：一族 `pta_*` 工具（描述即流程）+ 写入 ~/.dsh/skills/pta-cli/SKILL.md 的原生 Skill。
  *   · 状态落盘：题目、答案、待办写在本插件自己的 state 目录，工具只回摘要。
- *   · 面板输入：/dsh-pta/api 由 Web 面板调用，Cookie 从表单直达凭据服务，不经过模型。
+ *   · 面板输入：/pta-autopilot/api 由 Web 面板调用，Cookie 从表单直达凭据服务，不经过模型。
  */
 import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
@@ -17,11 +17,11 @@ import { createLauncher } from './lib/launcher.js';
 import { createService } from './lib/service.js';
 import { redact } from './lib/pta.js';
 
-export const name = 'dsh-pta';
+export const name = 'pta-autopilot';
 export const inject = ['webServer', 'tools', 'connection'];
 
 const PKG_ROOT = dirname(fileURLToPath(import.meta.url));
-const API_PATH = '/dsh-pta/api';
+const API_PATH = '/pta-autopilot/api';
 const MAX_BODY = 512 * 1024;
 /** HTTP 契约版本：只加不改；破坏性改动才升。 */
 export const API_VERSION = 1;
@@ -86,7 +86,7 @@ async function readBody(req) {
 export const Config = {
   '~standard': {
     version: 1,
-    vendor: 'dsh-pta',
+    vendor: 'pta-autopilot',
     validate(value) {
       if (value === undefined || value === null) return { value: {} };
       if (typeof value !== 'object') return { issues: [{ message: 'config 必须是对象', path: [] }] };
@@ -369,7 +369,7 @@ export function apply(ctx, config = {}) {
       path: '/_pta/ping',
       handler: async (req, res) => {
         json(res, 200, {
-          ok: true, plugin: 'dsh-pta', version: PKG_VERSION, apiVersion: API_VERSION, pid: process.pid,
+          ok: true, plugin: 'pta-autopilot', version: PKG_VERSION, apiVersion: API_VERSION, pid: process.pid,
           stateDir, tools: registered, toolErrors,
           launch: launcher?.capability() ?? { available: false, mode: 'disabled' },
           at: new Date().toISOString(),
@@ -399,7 +399,7 @@ export function apply(ctx, config = {}) {
             const code = typeof error?.code === 'string' && ERRORS[error.code] ? error.code : 'agent_failed';
             const [status, message] = ERRORS[code] ?? [500, '操作未完成。'];
             if (code === 'agent_failed') {
-              log?.warn?.('[dsh-pta] API 请求失败', {
+              log?.warn?.('[pta-autopilot] API 请求失败', {
                 action: typeof input?.action === 'string' ? input.action : undefined,
                 errorName: error?.name ?? 'Error',
               });
@@ -407,7 +407,7 @@ export function apply(ctx, config = {}) {
             json(res, status, { ok: false, error: { code, message: redact(error?.message ?? message) } });
           }
         } catch (error) {
-          log?.warn?.(`[dsh-pta] API 处理异常：${error?.message ?? error}`);
+          log?.warn?.(`[pta-autopilot] API 处理异常：${error?.message ?? error}`);
           json(res, 500, { ok: false, error: { code: 'handler_failed', message: redact(error?.message ?? error) } });
         }
       },
@@ -421,7 +421,7 @@ export function apply(ctx, config = {}) {
       } catch (error) {
         const message = String(error?.message ?? error);
         toolErrors.push(`${definition.name}: ${message}`);
-        log?.warn?.(`[dsh-pta] 工具 ${definition.name} 注册失败：${message}`);
+        log?.warn?.(`[pta-autopilot] 工具 ${definition.name} 注册失败：${message}`);
       }
     }
 
@@ -431,8 +431,8 @@ export function apply(ctx, config = {}) {
     // 4) 原生 Skill：同步到 ~/.dsh/skills/pta-cli/SKILL.md
     if (config.syncSkill !== false) {
       void syncSkill(skillDir).then((result) => {
-        if (result.changed) log?.info?.(`[dsh-pta] 已同步 Skill 到 ${result.path}`);
-      }).catch((error) => log?.warn?.(`[dsh-pta] Skill 同步失败：${error?.message ?? error}`));
+        if (result.changed) log?.info?.(`[pta-autopilot] 已同步 Skill 到 ${result.path}`);
+      }).catch((error) => log?.warn?.(`[pta-autopilot] Skill 同步失败：${error?.message ?? error}`));
     }
 
     return () => {

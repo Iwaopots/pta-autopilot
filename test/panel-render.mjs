@@ -1,5 +1,5 @@
 /**
- * 面板灰箱测试：在 jsdom 里用真实 React 渲染 client.js 的 Panel，桩掉 /dsh-pta/api，
+ * 面板灰箱测试：在 jsdom 里用真实 React 渲染 client.js 的 Panel，桩掉 /pta-autopilot/api，
  * 验证三栏都渲染、「一键完成」走 dispatch、队列/日志显示回写的进度。
  *
  * 需要 react@18、react-dom@18、jsdom（devDependencies，`npm install` 即装好；插件运行时不依赖它们）。

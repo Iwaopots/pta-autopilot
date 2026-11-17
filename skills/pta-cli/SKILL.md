@@ -1,10 +1,10 @@
 ---
 name: pta-cli
-description: 用 dsh-pta 工具包处理 PTA（pintia.cn）课程作业：列账号与未结束题目集、拉题落盘、按题型压缩读题、整卷提交客观题、提交编程题并查判题。账号凭据由 DSH 凭据服务按账号隔离，Cookie 不进对话。
+description: 用 pta-autopilot 工具包处理 PTA（pintia.cn）课程作业：列账号与未结束题目集、拉题落盘、按题型压缩读题、整卷提交客观题、提交编程题并查判题。账号凭据由 DSH 凭据服务按账号隔离，Cookie 不进对话。
 whenToUse: 用户提到 PTA、pintia、拼题A、PTA 作业/题目集/提交判题，或要求查看某门课的作业进度时使用。
 ---
 
-# PTA 作业（dsh-pta）
+# PTA 作业（pta-autopilot）
 
 平台动作全部由 `pta_*` 工具完成；你只负责读题、写代码、判断答案。账号凭据在 DSH 凭据服务里按账号一条记录保存，**你看不到也不需要 Cookie**。
 

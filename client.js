@@ -1,12 +1,12 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-pta',
+  id: 'pta-autopilot',
   factory: (require) => {
     const React = require('react');
     const h = React.createElement;
     const { useCallback, useEffect, useRef, useState } = React;
 
-    const PANEL_ID = 'dsh-pta';
-    const API = '/dsh-pta/api';
+    const PANEL_ID = 'pta-autopilot';
+    const API = '/pta-autopilot/api';
     const CAPTCHA_APP_ID = '194593025';
 
     // 颜色一律走 DSH 主题 token（--dsw-alias-*），后面的值只是缺省兜底。
@@ -612,11 +612,11 @@ window.__ModuleLoader__.load({
     function apply(ctx) {
       ctx.effect(() => {
         const style = document.createElement('style');
-        style.dataset.pluginCss = 'dsh-pta';
+        style.dataset.pluginCss = 'pta-autopilot';
         style.textContent = css;
         document.head.append(style);
         return () => style.remove();
-      }, 'dsh-pta: styles');
+      }, 'pta-autopilot: styles');
       // 「打开会话」按需取 sessions / uiWorkspace：取不到就不显示按钮，不作为硬依赖（避免旧版 DSH 上插件加载失败）
       const openSession = async (sessionId) => {
         const sessions = ctx.get?.('sessions', false);

@@ -1,4 +1,4 @@
-# dsh-pta 架构（模块边界 / 稳定性 / 版本策略）
+# pta-autopilot 架构（模块边界 / 稳定性 / 版本策略）
 
 目标：**面板点、模型做**；每个模块可单独拆出使用；DSH 升级 / 插件升级不互相拖垮。
 
@@ -6,7 +6,7 @@
 
 ```
 client.js                 ← 仅 UI：调用 HTTP API，不直接碰 PTA / 凭据
-  │  POST /dsh-pta/api   {action, ...}  →  {ok, apiVersion, data}
+  │  POST /pta-autopilot/api   {action, ...}  →  {ok, apiVersion, data}
 index.js                  ← DSH 适配层：路由 / 工具 / Skill 同步 / 错误映射 / 调度节拍
   │
 lib/launcher.js           ← DSH 会话端口：sessionController / agents 能力探测 → 开会话 → followup
@@ -22,7 +22,7 @@ lib/service.js            ← 用例层：账号动作、完成度、拉题、�
 - `lib/pta.js`、`lib/scheduler.js` 不依赖 DSH，可被 CLI / 测试 / 其他宿主直接 import。
 - `lib/service.js` 只依赖 `pta + accounts + scheduler` 和一个可选的 `launcher` 端口，可套到 HTTP / MCP / CLI 任意入口。
 - DSH 耦合只在 `index.js`（ctx.webServer / tools / connection / credentials）和 `lib/launcher.js`（sessionController / agents / sessions）两处。
-- `client.js` 只认 `/dsh-pta/api` 契约。
+- `client.js` 只认 `/pta-autopilot/api` 契约。
 - `vendor/pta-cli/` 是第三方快照，可整目录删除，只影响 `pta_cli` 工具。
 
 ## 2. 一键完成（会话注入）
@@ -73,7 +73,7 @@ lib/service.js            ← 用例层：账号动作、完成度、拉题、�
 ## 4. 目录
 
 ```
-dsh-pta/
+pta-autopilot/
 ├── index.js            DSH 适配层
 ├── client.js           面板（单账号两栏 / 多账号三栏：账号｜完成度｜任务队列 + 操作日志）
 ├── lib/pta.js          协议层
@@ -92,7 +92,7 @@ dsh-pta/
 
 ## 5. 多账号（v0.5.0）
 
-- **身份隔离**：每个账号独立凭据记录（`dsh-pta/account-<uuid>`）、独立工作区 `<stateDir>/work/<account>/<psid>/`。同一 PSID 在不同账号下互不覆盖；v0.4 的共享目录只读兜底。
+- **身份隔离**：每个账号独立凭据记录（`pta-autopilot/account-<uuid>`）、独立工作区 `<stateDir>/work/<account>/<psid>/`。同一 PSID 在不同账号下互不覆盖；v0.4 的共享目录只读兜底。
 - **账号级并发配额**：`perAccountConcurrent`（默认 1）。同一账号同时只跑一个任务，跨账号并行由全局 `maxConcurrent` 控制。配额与互斥分离：配额管并行度，账号锁管互斥。
 - **跨账号派发**：`dispatch.all { all: true }` 遍历 ready 账号各自入队；`auth_required` 账号跳过并记录原因，不阻塞其他账号。
 - **可观测**：`tasks.board.byAccount` 给出每账号各状态计数；`paused` 标出被暂停账号，重登/校验通过后自动 `resume` 并 `pump`。

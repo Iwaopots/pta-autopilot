@@ -51,7 +51,7 @@ function makeReq(body, method = 'POST') {
   const payload = Buffer.from(JSON.stringify(body));
   return {
     method,
-    url: '/dsh-pta/api',
+    url: '/pta-autopilot/api',
     headers: { 'content-type': 'application/json' },
     async *[Symbol.asyncIterator]() {
       yield payload;
@@ -68,7 +68,7 @@ function makeRes() {
   };
 }
 
-const dir = await mkdtemp(join(tmpdir(), 'dsh-pta-smoke-'));
+const dir = await mkdtemp(join(tmpdir(), 'pta-autopilot-smoke-'));
 const stateDir = join(dir, 'state');
 const skillDir = join(dir, 'skills');
 const credentials = fakeCredentials();
@@ -88,8 +88,8 @@ try {
   });
 
   await check('注册 API 与诊断路由，ping 无工具错误', async () => {
-    const api = sink.routes.find((route) => route.path === '/dsh-pta/api');
-    assert.ok(api, '缺少 /dsh-pta/api 路由');
+    const api = sink.routes.find((route) => route.path === '/pta-autopilot/api');
+    assert.ok(api, '缺少 /pta-autopilot/api 路由');
     assert.equal(api.kind, 'exact');
     const ping = sink.routes.find((route) => route.path === '/_pta/ping');
     assert.ok(ping);
@@ -106,7 +106,7 @@ try {
 
   await check('API 队列视图 tasks.board 可用且带 apiVersion', async () => {
     const res = makeRes();
-    await sink.routes.find((route) => route.path === '/dsh-pta/api').handler(makeReq({ action: 'tasks.board' }), res);
+    await sink.routes.find((route) => route.path === '/pta-autopilot/api').handler(makeReq({ action: 'tasks.board' }), res);
     const body = JSON.parse(res.body);
     assert.equal(body.ok, true, res.body);
     assert.equal(body.apiVersion, 1);
@@ -151,7 +151,7 @@ try {
     throw new Error('Skill 没有在 2s 内同步');
   });
 
-  const route = sink.routes.find((item) => item.path === '/dsh-pta/api');
+  const route = sink.routes.find((item) => item.path === '/pta-autopilot/api');
 
   await check('空账号时 pta_accounts 给出引导', async () => {
     const tool = sink.tools.find((item) => item.name === 'pta_accounts');
@@ -206,7 +206,7 @@ try {
 
     const session = await vault.session(account.id);
     assert.equal(session.cookie, 'abc', '入库应去掉 PTASession= 前缀，只留 token');
-    assert.equal(credentials.records.has(`dsh-pta/account-${account.id}`), true);
+    assert.equal(credentials.records.has(`pta-autopilot/account-${account.id}`), true);
 
     await vault.add({ label: '张三', cookie: 'PTASession=abc2', probe: async () => ({ nickname: '张三同学', email: '', uid: '9001' }) });
     assert.equal(vault.list().length, 1, '同一 uid 应更新而不是新增');

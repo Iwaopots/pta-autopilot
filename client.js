@@ -454,7 +454,7 @@ window.__ModuleLoader__.load({
       const pausedBanner = paused.length ? h('div', { className: 'ptap-msg err' },
         h('div', { className: 'ptap-grow' }, paused.map(([id, row]) => `账号「${accounts.find((a) => a.id === id)?.label ?? id.slice(0, 8)}」${REASON_TEXT[row.reason] ?? row.reason}，它的任务已暂停；重登成功后自动继续。`).join('\n')),
         h('div', { className: 'ptap-actions' },
-          h('button', { className: 'ptap-btn', disabled: busy !== '', onClick: () => { const [id] = paused[0]; const row = accounts.find((a) => a.id === id); setRelogin({ id, label: row?.label ?? id, password: '' }); } }, '重登'),
+          h('button', { className: 'ptap-btn', disabled: busy !== '', onClick: () => { const [id] = paused[0]; const row = accounts.find((a) => a.id === id); setRelogin({ id, label: row?.label ?? id, login: row?.login || row?.email || '', password: '' }); } }, '重登'),
           h('button', { className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run('resume', async () => { await call('tasks.resume', { account: paused[0][0] }); return '队列已继续'; }) }, '直接继续'))) : null;
 
       // ── 题目集完成度 ──

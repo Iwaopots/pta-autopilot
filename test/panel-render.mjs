@@ -185,6 +185,15 @@ await check('登录失效暂停：显示提示条，可直接继续队列', asyn
   assert.ok(calls.includes('tasks.resume'));
 });
 
+await check('暂停条「重登」打开重登框，登录名可空着补填', async () => {
+  board = { ...board, paused: { 'acc-1': { reason: 'auth_required', at: new Date().toISOString(), message: 'x' } } };
+  await click(button('全部刷新'), 120);
+  await click(button('重登'), 80);
+  assert.ok(text().includes('重新登录'), '应打开重登框');
+  assert.ok(document.querySelector('input[placeholder="邮箱 / 手机号"]'), '重登框应有登录名输入');
+  assert.ok(button('登录').disabled, '登录名和密码都空时按钮应禁用');
+});
+
 await act(async () => { root.unmount(); });
 
 await check('多账号时恢复三栏，账号栏完整显示', async () => {

@@ -13,6 +13,7 @@ import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createDiagLog } from './lib/diag.js';
 import { createLauncher } from './lib/launcher.js';
 import { createService } from './lib/service.js';
 import { redact } from './lib/pta.js';
@@ -41,7 +42,7 @@ const ERRORS = {
   not_found: [404, '记录不存在。'],
   auth_required: [409, 'PTA 登录已失效，请重新录入该账号。'],
   invalid_credentials: [409, 'PTA 账号或密码不对（也可能被风控）。'],
-  captcha_required: [409, 'PTA 这次要求滑块验证码：密码直登过不去，请切到「粘贴 Cookie」登录一次。'],
+  captcha_required: [409, 'PTA 要求滑块验证：请点「滑块后登录」完成验证；滑块加载不出来时改用「粘贴 Cookie」。'],
   credentials_unavailable: [503, '当前 profile 没有可用的凭据服务。'],
   not_pulled: [409, '还没有拉题：先调用 pta_pull。'],
   not_started: [409, '题目集未开始、已结束或没有权限。'],
@@ -352,6 +353,7 @@ export function apply(ctx, config = {}) {
   const stateDir = config.stateDir ?? defaultStateDir();
   const skillDir = config.skillDir ?? defaultSkillDir();
   const log = ctx.logger;
+  const diag = createDiagLog(stateDir);
 
   ctx.effect(() => {
     const launcher = config.autoLaunch === false ? undefined : createLauncher(ctx, { cwd: join(stateDir, 'work'), log });
@@ -370,7 +372,7 @@ export function apply(ctx, config = {}) {
       handler: async (req, res) => {
         json(res, 200, {
           ok: true, plugin: 'pta-autopilot', version: PKG_VERSION, apiVersion: API_VERSION, pid: process.pid,
-          stateDir, tools: registered, toolErrors,
+          stateDir, logFile: diag.file, tools: registered, toolErrors,
           launch: launcher?.capability() ?? { available: false, mode: 'disabled' },
           at: new Date().toISOString(),
         });
@@ -380,6 +382,8 @@ export function apply(ctx, config = {}) {
       kind: 'exact',
       path: API_PATH,
       async handler(req, res) {
+        const startedAt = Date.now();
+        let action = '';
         try {
           const denied = ctx.connection?.requestRejection?.(req);
           if (denied !== undefined) {
@@ -393,10 +397,17 @@ export function apply(ctx, config = {}) {
           let input;
           try {
             input = await readBody(req);
+            action = typeof input?.action === 'string' ? input.action : '';
             const data = await dispatch(service, input);
+            diag.info('api.ok', { action, ms: Date.now() - startedAt, account: data?.account?.id });
             json(res, 200, { ok: true, apiVersion: API_VERSION, data });
           } catch (error) {
             const code = typeof error?.code === 'string' && ERRORS[error.code] ? error.code : 'agent_failed';
+            diag.warn('api.error', {
+              action, code, ms: Date.now() - startedAt,
+              errorName: error?.name ?? 'Error',
+              message: redact(String(error?.message ?? '')).slice(0, 300),
+            });
             const [status, message] = ERRORS[code] ?? [500, '操作未完成。'];
             if (code === 'agent_failed') {
               log?.warn?.('[pta-autopilot] API 请求失败', {
@@ -408,6 +419,7 @@ export function apply(ctx, config = {}) {
           }
         } catch (error) {
           log?.warn?.(`[pta-autopilot] API 处理异常：${error?.message ?? error}`);
+          diag.error('api.handler_failed', { action, ms: Date.now() - startedAt, message: redact(String(error?.message ?? error)).slice(0, 300) });
           json(res, 500, { ok: false, error: { code: 'handler_failed', message: redact(error?.message ?? error) } });
         }
       },
@@ -459,7 +471,7 @@ async function dispatch(service, input) {
     case 'accounts.add':
       return service.addAccount({ label: input.label, cookie: input.cookie, login: input.login, password: input.password, ticket: input.ticket, randStr: input.randStr });
     case 'accounts.relogin':
-      return service.relogin({ id: input.id, password: input.password, ticket: input.ticket, randStr: input.randStr });
+      return service.relogin({ id: input.id, login: input.login, password: input.password, ticket: input.ticket, randStr: input.randStr });
     case 'accounts.check':
       return service.checkAccount({ id: input.id });
     case 'accounts.remove':

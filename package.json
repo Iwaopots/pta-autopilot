@@ -1,6 +1,6 @@
 {
   "name": "pta-autopilot",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "PTA 作业自动驾驶 · DSH（DeepSeek Harness）插件：面板一键派发直达模型、多账号并发调度、凭据隔离、原生 Skill。",
   "type": "module",
   "main": "./index.js",

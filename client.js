@@ -220,8 +220,7 @@ window.__ModuleLoader__.load({
           return result;
         } catch (cause) {
           if (cause.code === 'captcha_required') {
-            setMode('cookie');
-            setError('PTA 这次要求滑块验证码。点「完成滑块验证」，或切到「粘贴 Cookie」。');
+            setError('PTA 要求滑块验证：点「滑块后登录」完成验证。滑块加载不出来时，切到「粘贴 Cookie」。');
           } else {
             setError(String(cause.message ?? cause));
           }
@@ -276,7 +275,7 @@ window.__ModuleLoader__.load({
       });
 
       const redo = () => run(`relogin:${relogin.id}`, async () => {
-        const result = await call('accounts.relogin', { id: relogin.id, password: relogin.password, ...takeTicket() });
+        const result = await call('accounts.relogin', { id: relogin.id, login: relogin.login.trim(), password: relogin.password, ...takeTicket() });
         setRelogin(null);
         return `已重新登录 ${result?.account?.nickname || ''}`;
       });
@@ -361,7 +360,7 @@ window.__ModuleLoader__.load({
         single ? null : h('button', { key: 'view', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setSetsAccount(account.id); void loadSets(account.id); } }, '看进度'),
         account.id !== defaultAccount ? h('button', { key: 'def', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`default:${account.id}`, async () => { await call('accounts.default', { id: account.id }); return `默认账号已切到 ${account.label}`; }) }, '设为默认') : null,
         h('button', { key: 'check', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => run(`check:${account.id}`, async () => { const r = await call('accounts.check', { id: account.id }); return `校验通过：${r?.account?.nickname || ''}`; }) }, busy === `check:${account.id}` ? '校验中…' : '校验'),
-        h('button', { key: 'relogin', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setRelogin({ id: account.id, label: account.label, password: '' }); setError(''); } }, '重登'),
+        h('button', { key: 'relogin', className: 'ptap-btn ghost', disabled: busy !== '', onClick: () => { setRelogin({ id: account.id, label: account.label, login: account.login || account.email || '', password: '' }); setError(''); } }, '重登'),
         h('button', { key: 'rm', className: 'ptap-btn ghost danger', disabled: busy !== '', onClick: () => { if (window.confirm(`删除账号「${account.label}」及其凭据？\n队列里这个账号的任务不会自动删除。`)) void run(`remove:${account.id}`, async () => { await call('accounts.remove', { id: account.id }); return '已删除（凭据一并删除）'; }); } }, '删除'),
       ];
       const statusChip = (account) => h(Chip, { kind: account.status === 'ready' ? 'ok' : 'bad' }, STATUS_TEXT[account.status] ?? account.status);
@@ -389,10 +388,12 @@ window.__ModuleLoader__.load({
       const reloginBox = relogin ? h('div', { className: 'ptap-cardbody ptap-collapse' },
         h('div', { className: 'ptap-label', style: { marginBottom: 8 } }, `重新登录 · ${relogin.label}`),
         h('div', { className: 'ptap-field' },
+          h('input', { className: 'ptap-input', value: relogin.login, autoComplete: 'off', placeholder: '邮箱 / 手机号', onChange: (e) => setRelogin({ ...relogin, login: e.target.value }) })),
+        h('div', { className: 'ptap-field' },
           h('input', { className: 'ptap-input', type: 'password', autoComplete: 'off', placeholder: '密码（只用一次，不保存）', value: relogin.password, onChange: (e) => setRelogin({ ...relogin, password: e.target.value }) })),
         h('div', { className: 'ptap-actions' },
-          h('button', { className: 'ptap-btn primary', disabled: busy !== '' || !relogin.password, onClick: redo }, busy.startsWith('relogin') ? '登录中…' : '登录'),
-          h('button', { className: 'ptap-btn', disabled: busy !== '' || !relogin.password, onClick: () => solveCaptcha(redo) }, '滑块后登录'),
+          h('button', { className: 'ptap-btn primary', disabled: busy !== '' || !relogin.login.trim() || !relogin.password, onClick: redo }, busy.startsWith('relogin') ? '登录中…' : '登录'),
+          h('button', { className: 'ptap-btn', disabled: busy !== '' || !relogin.login.trim() || !relogin.password, onClick: () => solveCaptcha(redo) }, '滑块后登录'),
           h('button', { className: 'ptap-btn ghost', onClick: () => setRelogin(null) }, '取消'))) : null;
 
       const addBox = showAdd ? h('div', { className: 'ptap-cardbody ptap-collapse' },
@@ -586,6 +587,8 @@ window.__ModuleLoader__.load({
           close ? h('button', { className: 'ptap-btn', onClick: close }, '关闭') : null),
         error ? h('div', { className: 'ptap-msg err' }, error) : null,
         notice ? h('div', { className: 'ptap-msg ok' }, notice) : null,
+        h('div', { className: 'ptap-hint', style: { marginTop: -2, marginBottom: 6, wordBreak: 'break-all' }, title: '登录/面板请求的诊断日志' },
+          `诊断日志：${info?.stateDir ?? '~/.dsh/storages/pta'}\\logs\\plugin.log`),
         pausedBanner,
         single ? accountBar : null,
         kpis,

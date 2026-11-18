@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 — 2026-11-18
+
+### 修复
+- **重登可补登录名**：`accounts.relogin` 接受面板传入的 `login`；老账号的 `login/email` 为空时，不再直接抛「请用添加账号重新登录」，可在「重登」框里补邮箱/手机号。账号投影新增 `login` 字段（非敏感，用于回填）。
+- **验证码提示纠正**：密码登录返回 `captcha_required` 时不再把表单切到「粘贴 Cookie」，而是保留密码表单并提示点「滑块后登录」；滑块加载失败才建议改用 Cookie。同步修正 `lib/pta.js` 与 `ERRORS` 文案。
+
+### 诊断
+- 新增 `lib/diag.js`：把面板 API 的动作、错误码、耗时和脱敏后的错误文本写到 `<stateDir>/logs/plugin.log`（JSONL，2 MB 轮转），不含密码、Cookie、ticket。
+- `/_pta/ping` 新增 `logFile`；面板顶部显示日志路径。
+
+### 发布
+- 新增 `scripts/deploy.ps1`：检查/创建 desktop profile 的 `pta-autopilot` junction，不删除已有目录。
+
 ## 0.6.0 — 2026-11-17
 
 ### 改名
